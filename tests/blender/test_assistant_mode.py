@@ -2,10 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Installed assistant-only surface, local scene work and lifecycle cleanup."""
 
-import base64
 import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -21,11 +19,16 @@ LOCAL_TOOLS = {
     "screenshot_viewport",
     "camera_path",
     "render_still",
+    "snapshot_render_result",
     "blender_api_help",
     "datablocks_summary",
 }
 ASSISTANT_TOOLS = {
     "agent_workspace",
+    "save_agent_result",
+    "list_agent_results",
+    "inspect_agent_result",
+    "prepare_agent_result",
     "import_agent_image",
     "import_agent_material",
     "restore_agent_material",
@@ -136,27 +139,16 @@ class AssistantModeTests(unittest.TestCase):
     def test_screenshot_and_render_tools_remain_exposed_without_a_provider(self):
         registry = self.service.build_registry()
         tools = submodule("mcp.tools_blender")
-        capture = submodule("blender.capture")
         self.assertIs(registry.get("screenshot_viewport").handler, tools.screenshot_viewport)
         self.assertIs(registry.get("render_still").handler, tools.render_still)
+        self.assertIs(registry.get("snapshot_render_result").handler, tools.snapshot_render_result)
         if bpy.app.background:
             with self.assertRaisesRegex(RuntimeError, "GUI"):
                 tools.screenshot_viewport({})
-        created = []
-        data = b"\x89PNG\r\n\x1a\nfixture"
-
-        def write_capture(context, path, **options):
-            self.assertEqual(context.scene, bpy.context.scene)
-            self.assertEqual(options, {"source": "VIEWPORT", "width": 320, "height": 180})
-            created.append(Path(path))
-            Path(path).write_bytes(data)
-
-        with patch.object(capture, "capture_still", side_effect=write_capture):
-            result = tools.render_still({"source": "VIEWPORT", "width": 320, "height": 180})
-        self.assertEqual(result["mimeType"], "image/png")
-        self.assertEqual(base64.b64decode(result["_image"]), data)
-        self.assertEqual(len(created), 1)
-        self.assertFalse(created[0].parent.exists())
+            with self.assertRaisesRegex(RuntimeError, "GUI"):
+                tools.render_still({"source": "VIEWPORT", "width": 320, "height": 180})
+        # Pixel decoding, retained output and actual GUI capture are exercised by
+        # test_agent_still_inputs; fake header bytes cannot establish that contract.
 
     def test_setup_and_panels_draw_without_writes_or_starting_a_connection(self):
         setup = submodule("blender.provider_setup")

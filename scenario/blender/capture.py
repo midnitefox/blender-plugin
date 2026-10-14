@@ -45,6 +45,8 @@ class RenderSettings:
     media_type: str = ""
     frame_current: int = 1
     frame_subframe: float = 0.0
+    color_depth: str = "8"
+    compression: int = 15
 
     @classmethod
     def snapshot(cls, scene):
@@ -68,6 +70,8 @@ class RenderSettings:
             getattr(r.image_settings, "media_type", ""),
             scene.frame_current,
             scene.frame_subframe,
+            r.image_settings.color_depth,
+            r.image_settings.compression,
         )
 
     def restore(self, scene):
@@ -83,8 +87,10 @@ class RenderSettings:
             r.image_settings.file_format = self.file_format
         try:
             r.image_settings.color_mode = self.color_mode
+            r.image_settings.color_depth = self.color_depth
         except TypeError:
             pass
+        r.image_settings.compression = self.compression
         r.filepath, r.use_stamp = self.filepath, self.use_stamp
         scene.frame_start, scene.frame_end = self.frame_start, self.frame_end
         _set_preview_range(scene, self.use_preview_range)
@@ -243,6 +249,9 @@ class _Overlays:
                     space.show_gizmo,
                     space.shading.type,
                     space.shading.color_type,
+                    tuple(space.shading.single_color),
+                    space.shading.light,
+                    space.shading.studio_light,
                 )
             )
             space.overlay.show_overlays = False
@@ -250,14 +259,22 @@ class _Overlays:
             if self.force_solid:
                 space.shading.type = "SOLID"
                 space.shading.color_type = "SINGLE"
+                space.shading.single_color = (0.8, 0.8, 0.8)
+                space.shading.light = "STUDIO"
+                space.shading.studio_light = "paint.sl"
         return self
 
     def __exit__(self, *exc):
-        for space, (overlays, gizmo, shading, color) in zip(self.spaces, self.saved, strict=False):
+        for space, (overlays, gizmo, shading, color, single, light, studio) in zip(
+            self.spaces, self.saved, strict=False
+        ):
             space.overlay.show_overlays = overlays
             space.show_gizmo = gizmo
             space.shading.type = shading
             space.shading.color_type = color
+            space.shading.single_color = single
+            space.shading.light = light
+            space.shading.studio_light = studio
         return False
 
 
@@ -291,6 +308,8 @@ def capture_still(
         r.resolution_percentage = 100
         set_image_output(r, "PNG")
         r.image_settings.color_mode = "RGB"
+        r.image_settings.color_depth = "8"
+        r.image_settings.compression = 15
         r.use_stamp = False
         r.filepath = str(path)
         with _Overlays(context, force_solid):

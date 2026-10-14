@@ -15,7 +15,7 @@ imports the supplied results. Structured blockout, mesh-edit round trips and
 animated reference captures are also available. Film tools build editable shot
 scenes, assemble director timelines, arrange finished media for review, export
 MP4s and package portable editable projects.
-Animation retargeting remains unfinished.
+Existing-rig animation retargeting is unsupported.
 
 ## Install and connect
 
@@ -60,7 +60,7 @@ Use the same local inbox and ask the assistant to choose the matching tool:
 
 | Asset | Local handoff |
 | --- | --- |
-| PBR material | `import_agent_material` applies supplied base color and optional roughness, metallic, normal, height and AO maps to one named UV mesh. |
+| PBR material | `import_agent_material` applies supplied PNG/JPEG/WebP/EXR maps to a named UV mesh, including smoothness conversion and retained edge maps. |
 | Environment | `import_agent_environment` applies a supplied 2:1 equirectangular PNG, JPEG, EXR or Radiance HDR to the World. |
 | Model | `import_agent_model` imports a self-contained GLB, retaining supported materials, textures, rigs and animation data. |
 | Model package | `import_agent_model_package` imports glTF/OBJ with explicit dependencies, embedded-texture FBX or mesh PLY. |
@@ -73,6 +73,12 @@ project when sharing or moving it. Material and environment tools also provide
 guarded restoration during the current session. See the [user guide](docs/USER_GUIDE.md)
 for limits and examples. The assistant needs a suitable generation tool for
 each requested asset; image generation alone does not provide all asset types.
+
+Ask the assistant to save assets you want to reuse with `save_agent_result`.
+The local library retains verified copies and descriptions independently of the
+inbox and chat. The assistant can discover them with `list_agent_results`, inspect
+their details or image previews, then prepare their files for a new import.
+Reuse requires choosing a destination in the current project.
 
 ## Local Blender control
 
@@ -88,6 +94,12 @@ Manual edits and unrelated objects are protected by revision and content checks.
 For mesh edits, it exports a named supported static mesh, works on that snapshot
 with its own tools, and applies a returned GLB with an explicit remesh, UV,
 retexture, parts or rig policy. The original target must remain unchanged.
+An object-local export supports mirrored sources. Reference-only exports can
+snapshot evaluated meshes with modifiers or deformation, including up to 64
+explicit meshes in world coordinates. Those snapshots cannot authorize an edit.
+
+Quick stills support grey clay shading. `snapshot_render_result` preserves the
+existing Render Result as a verified PNG reference without starting a new render.
 
 `capture_agent_animation` creates a silent MP4 camera or viewport reference,
 up to 20 seconds and 1920×1080, with optional grey clay shading. It restores

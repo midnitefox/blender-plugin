@@ -28,6 +28,12 @@ is Blender 5.0; dependency and runtime acceptance have separate gates.
   scenes. Film builders use local recipes, persistent scene identities and
   explicit inbox assets; they do not use retained service job/session wrappers.
   [The current MCP reference](../MCP.md) is generated from that registry.
+- [tools_agent_results.py](../../scenario/mcp/tools_agent_results.py) exposes
+  explicit saved local bundles through [assistant_results.py](../../scenario/core/assistant_results.py).
+  File copying and digest verification run on the request thread. Main-thread
+  preview decoding uses temporary Blender data. Listings validate metadata;
+  inspection and preparation verify bytes before reuse. The library preserves
+  files and roles, with no scene targets, provider session or automatic application.
 - [assistant_film_export.py](../../scenario/blender/assistant_film_export.py)
   owns local export/package operations. Main-thread preparation snapshots current
   scene contents; offline workers render or copy/rewrite/reopen portable projects.
@@ -45,8 +51,9 @@ is Blender 5.0; dependency and runtime acceptance have separate gates.
 Retained SDK and service modules are not active registration dependencies.
 Reusing a local helper must not import those modules transitively. Native
 assistant tests check the registered tools and loaded modules in an isolated
-installed package. Full film orchestration and animation retargeting remain
-unfinished; asset import alone does not establish creative workflow parity.
+installed package. Existing-rig retargeting is unsupported. Actual generation
+coverage and quality depend on the connected assistant's available tools;
+asset import alone does not establish creative workflow parity.
 
 ## Historical upstream implementation
 

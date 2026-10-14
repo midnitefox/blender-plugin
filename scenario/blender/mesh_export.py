@@ -26,7 +26,7 @@ def source_objects(context):
     return meshes
 
 
-def export_glb(context, objects, path=None):
+def export_glb(context, objects, path=None, *, only_scene=False, current_frame=False):
     """Write `objects` to a GLB (materials and textures embedded, modifiers applied) and return the path.
 
     The glTF exporter is a bundled add-on; it is missing only in stripped builds, which we report instead of crashing."""
@@ -48,6 +48,8 @@ def export_glb(context, objects, path=None):
             filepath=path,
             export_format="GLB",
             use_selection=True,
+            use_active_scene=only_scene,
+            export_current_frame=current_frame,
             export_apply=True,
             export_yup=True,
             export_animations=False,

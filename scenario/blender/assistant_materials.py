@@ -13,10 +13,28 @@ from pathlib import Path
 import bpy
 from bpy.app.handlers import persistent
 
-from ..core.scene.panorama import MAX_FILE_BYTES, MAX_PIXELS, PanoramaInfo, inspect_panorama
+from ..core.agent_artifacts import MAX_IMAGE_BYTES
+from ..core.jobs.result_previews import bounded_local_image, local_image_layout
+from ..core.scene.panorama import (
+    MAX_FILE_BYTES,
+    MAX_PIXELS,
+    PanoramaInfo,
+    inspect_image,
+    inspect_panorama,
+)
 from . import world_application as worlds
 
-MAP_ROLES = ("base_color", "roughness", "metallic", "normal", "height", "ambient_occlusion")
+MAP_ROLES = (
+    "base_color",
+    "roughness",
+    "smoothness",
+    "metallic",
+    "normal",
+    "height",
+    "ambient_occlusion",
+    "edge",
+)
+MAX_MAP_BYTES = 256 * 1024 * 1024
 _materials = {}
 _environments = {}
 
@@ -55,6 +73,15 @@ def _target(name):
 
 def _slots(obj):
     return tuple((slot.link, slot.material) for slot in obj.material_slots)
+
+
+def _restore_slot(slot, previous):
+    link, material = previous
+    if slot.link == "OBJECT" and link == "DATA":
+        # Switching link alone leaves an invisible object override with a user
+        # on the staged material, preventing its images/material from retiring.
+        slot.material = None
+    slot.link, slot.material = link, material
 
 
 def _geometry(mesh):
@@ -100,24 +127,59 @@ def _signature(material, images):
 
 def _discard(material=None, images=(), mesh=None):
     for value, collection in (
+        (mesh, bpy.data.meshes),
         (material, bpy.data.materials),
         *((image, bpy.data.images) for image in images),
-        (mesh, bpy.data.meshes),
     ):
         if worlds._present(value, collection) and value.users == 0:
             collection.remove(value)
 
 
-def _decode_map(snapshot, inbox, role):
+def _map_info(snapshot):
+    """Bound the declared allocation before Blender decodes a material map."""
+    formats = {
+        ".png": ("PNG", b"\x89PNG\r\n\x1a\n"),
+        ".jpg": ("JPEG", b"\xff\xd8\xff"),
+        ".jpeg": ("JPEG", b"\xff\xd8\xff"),
+        ".webp": ("WEBP", b"RIFF"),
+        ".exr": ("OPEN_EXR", b"\x76\x2f\x31\x01"),
+    }
+    expected = formats.get(snapshot.suffix)
+    data = snapshot.data
+    limit = MAX_FILE_BYTES if snapshot.suffix == ".exr" else MAX_IMAGE_BYTES
+    if not data or len(data) > limit:
+        raise ValueError("Material map exceeds its per-file byte limit")
+    if (
+        expected is None
+        or not data.startswith(expected[1])
+        or (snapshot.suffix == ".webp" and data[8:12] != b"WEBP")
+    ):
+        raise ValueError("Material map filename does not match its actual image format")
+    layout = local_image_layout(data)
+    if layout is None or not bounded_local_image(*layout) or layout[0] * layout[1] > MAX_PIXELS:
+        raise ValueError("Material map has unsupported dimensions, channels or pixel limits")
+    width, height, channels = layout
+    if snapshot.suffix in {".png", ".exr"}:
+        info = inspect_image(data)
+        if (info.width, info.height) != (width, height) or info.file_format != expected[0]:
+            raise ValueError("Material map has conflicting image dimensions or format")
+    return PanoramaInfo(expected[0], width, height, snapshot.suffix == ".exr"), channels
+
+
+def _decode_map(snapshot, inbox, role, info):
     image = None
     try:
         with tempfile.TemporaryDirectory(prefix="map-", dir=inbox) as directory:
             path = Path(directory) / ("map" + snapshot.suffix)
             path.write_bytes(snapshot.data)
             image = bpy.data.images.load(str(path), check_existing=False)
-            width, height = image.size
-            if width < 1 or height < 1 or width * height > MAX_PIXELS or image.type != "IMAGE":
-                raise ValueError("Material map has no usable pixels or exceeds the pixel limit")
+            if (
+                tuple(image.size) != (info.width, info.height)
+                or image.file_format != info.file_format
+                or image.type != "IMAGE"
+                or (info.hdr_capable and not image.is_float)
+            ):
+                raise ValueError("Decoded material map does not match its verified container")
             image.colorspace_settings.name = "sRGB" if role == "base_color" else "Non-Color"
             image.pack()
             if not image.packed_file:
@@ -162,6 +224,13 @@ def _build_material(images, uv_name, height_distance):
         for role, socket in (("roughness", "Roughness"), ("metallic", "Metallic")):
             if role in textures:
                 links.new(textures[role].outputs["Color"], shader.inputs[socket])
+        if "smoothness" in textures:
+            invert = nodes.new("ShaderNodeInvert")
+            invert.label = "Smoothness to roughness"
+            invert.inputs["Fac"].default_value = 1.0
+            links.new(textures["smoothness"].outputs["Color"], invert.inputs["Color"])
+            links.new(invert.outputs["Color"], shader.inputs["Roughness"])
+        # Edge stays a named packed texture with UVs for deliberate artist wiring.
         normal = None
         if "normal" in textures:
             normal = nodes.new("ShaderNodeNormalMap")
@@ -240,7 +309,7 @@ class MaterialHandoff:
             link, material = self.previous_slots[self.active]
             if link == "DATA" and self.assigned_mesh.materials[self.active] != material:
                 raise ValueError("The shared mesh material changed; preserve it before restoring")
-            slot.link, slot.material = link, material
+            _restore_slot(slot, (link, material))
         _discard(
             self.material,
             self.images,
@@ -253,8 +322,20 @@ def apply_material(name, snapshots, inbox, *, height_distance=0.05):
     _bounded_number(height_distance, "Height distance", 0, 1000)
     if "base_color" not in snapshots or set(snapshots) - set(MAP_ROLES):
         raise ValueError("Provide base_color and only supported explicit map roles")
-    if sum(len(item.data) for item in snapshots.values()) > 256 * 1024 * 1024:
+    if "roughness" in snapshots and "smoothness" in snapshots:
+        raise ValueError("Provide either roughness or smoothness, not both")
+    if sum(len(item.data) for item in snapshots.values()) > MAX_MAP_BYTES:
         raise ValueError("Material maps exceed the combined 256 MiB byte limit")
+    infos = {role: _map_info(snapshot) for role, snapshot in snapshots.items()}
+    if sum(info.width * info.height for info, _ in infos.values()) > MAX_PIXELS:
+        raise ValueError("Material maps exceed the combined 32 megapixel limit")
+    if (
+        sum(info.width * info.height * channels for info, channels in infos.values())
+        > 4 * MAX_PIXELS
+    ):
+        raise ValueError("Material maps exceed the combined decoded-channel limit")
+    if len({(info.width, info.height) for info, _ in infos.values()}) != 1:
+        raise ValueError("Material maps must have matching dimensions")
     key = (
         tuple((role, snapshots[role].sha256) for role in MAP_ROLES if role in snapshots),
         height_distance,
@@ -268,12 +349,7 @@ def apply_material(name, snapshots, inbox, *, height_distance=0.05):
     try:
         for role in MAP_ROLES:
             if role in snapshots:
-                images[role] = _decode_map(snapshots[role], inbox, role)
-        if sum(image.size[0] * image.size[1] for image in images.values()) > MAX_PIXELS:
-            raise ValueError("Material maps exceed the combined 32 megapixel limit")
-        sizes = {tuple(image.size) for image in images.values()}
-        if len(sizes) != 1:
-            raise ValueError("Material maps must have matching dimensions")
+                images[role] = _decode_map(snapshots[role], inbox, role, infos[role][0])
         material = _build_material(images, before_mesh.uv_layers.active.name, height_distance)
         if _target(name) != obj or obj.data != before_mesh or _slots(obj) != before_slots:
             raise ValueError("The material destination changed while decoding the maps")
@@ -307,7 +383,7 @@ def apply_material(name, snapshots, inbox, *, height_distance=0.05):
             obj.data = before_mesh
         elif before_slots:
             slot = obj.material_slots[active]
-            slot.link, slot.material = before_slots[active]
+            _restore_slot(slot, before_slots[active])
         elif obj.data == before_mesh:
             obj.data.materials.clear()
         _discard(material, images.values(), copied)

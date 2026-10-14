@@ -57,9 +57,11 @@ Identical imported content can be reused without creating duplicate assets.
 For other assets, use the same inbox with these explicit handoffs:
 
 - `import_agent_material`: named UV mesh and a map of explicit roles to files.
-  Base color is required; roughness, metallic, OpenGL normal, bump height and
-  ambient occlusion are optional. PNG/JPEG/WebP maps need matching dimensions.
-  Limits are 64 MiB each, 256 MiB combined and 32 megapixels combined.
+  Base color is required; roughness or smoothness, metallic, OpenGL normal,
+  bump height, ambient occlusion and retained edge maps are optional.
+  PNG/JPEG/WebP and single-part non-deep scanline EXR need matching dimensions.
+  Limits are 64 MiB per PNG/JPEG/WebP, 128 MiB per EXR, 8192 pixels per edge,
+  256 MiB combined, 32 megapixels combined and 128 million decoded channel samples.
 - `import_agent_environment`: 2:1 equirectangular PNG/JPEG/EXR/Radiance HDR,
   up to 128 MiB and 32 megapixels. Packs the image into a new World. Projection,
   seamlessness and actual HDR content still require review.
@@ -83,10 +85,23 @@ File handoffs reject paths outside the inbox.
 
 The plugin cannot invoke the assistant's generation tools or access their
 accounts. A generated image supplies pixels; model creation, accurate PBR maps,
-rigging and other outputs require suitable assistant capabilities. Animation
-retargeting remains unfinished. The local
+rigging and other outputs require suitable assistant capabilities. Existing-rig
+animation retargeting is unsupported. The local
 mesh-edit round trip, structured blockout and animated-reference capture are
 available through dedicated tools below.
+
+## Saved local assets
+
+`save_agent_result` retains explicitly chosen inbox files, their roles, title and
+description in a local library. Required SHA-256 digests bind the saved bytes.
+`list_agent_results` discovers entries across sessions; `inspect_agent_result`
+verifies all files or previews one supported image. Saving is separate from
+format decoding and scene import. Descriptions are declared provenance.
+
+`prepare_agent_result` verifies a whole saved bundle, refuses filename collisions
+with different inbox content, and returns files plus an import recipe. It does
+not change the scene. Choose fresh targets, placement and timing before calling
+the matching import tool. A saved bundle cannot preserve a live mesh-edit handle.
 
 ## Modeling, scene design and video references
 
@@ -104,6 +119,10 @@ an explicit REMESH/UV/RETEXTURE/PARTS/RIG policy, a verified affine mapping and
 the `keep_original` choice. Source identity and content must remain unchanged.
 Successful or uncertain application consumes the handle; file load, Undo/Redo
 and disable clear pending exports. See each tool schema for source restrictions.
+Use object-local coordinates for mirrored edit sources. `mode: "REFERENCE"`
+instead snapshots evaluated geometry at the current frame, with no edit handle.
+World-space references can include up to 64 explicitly named meshes; local-space
+references use one. Reference-only snapshots cannot authorize `apply_agent_mesh`.
 
 `blockout_plan` returns the saved recipe, revision, planning guidance and limits.
 `build_agent_blockout` accepts a complete recipe and current revision for a
@@ -114,6 +133,9 @@ owned content against edits, sharing and outside references before removal.
 directory. It requires the GUI, validates actual decoded timing and dimensions,
 and restores capture settings on success or failure. The assistant must copy
 the clip for long-term storage and use its own video tools for generation.
+`render_still` supports optional grey clay shading and an explicit camera.
+`snapshot_render_result` copies an existing Render Result without rendering.
+Both retain verified PNGs and return a bounded inline preview.
 
 ## Editable film scenes
 
@@ -205,10 +227,19 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
-| `import_agent_material` | Apply an assistant-created PBR map set from the local inbox to one named editable mesh with UVs. Supply base_color and explicit optional roughness, metallic, normal, height and ambient_occlusion roles, each with filename and optional sha256. Maps must be PNG/JPEG/WebP with matching dimensions. Creates a new packed material in the active slot while preserving other objects and slots. Base color is sRGB; other maps are Non-Color. Normal uses OpenGL tangent space; height uses bump; AO multiplies base color. Repeating an unchanged set in this session reuses it. Does not create maps or establish their physical accuracy. | `object_name`*: string<br>`maps`*: object; Explicit role to {filename, sha256?}; base_color is required<br>`normal_convention`: string (['OPENGL'])<br>`height_distance`: number | - |
+| `import_agent_material` | Apply an assistant-created PBR map set from the local inbox to one named editable mesh with UVs. Supply base_color and explicit optional roughness OR smoothness, metallic, normal, height, ambient_occlusion and edge roles, each with filename and optional sha256. Maps accept PNG/JPEG/WebP or single-part non-deep scanline EXR, with matching dimensions and at most 8192 pixels per edge. Limits: 64 MiB per PNG/JPEG/WebP, 128 MiB per EXR, 256 MiB combined bytes, 32 megapixels combined and 128 million decoded channel samples. Creates a new packed material in the active slot while preserving other objects and slots. Base color is interpreted as sRGB including EXR; other maps are Non-Color. Smoothness is inverted into Roughness; Normal uses OpenGL tangent space; height uses bump; AO multiplies base color; edge remains a named packed node for manual wiring. Repeating an unchanged set in this session reuses it. Does not create maps or establish their physical accuracy. | `object_name`*: string<br>`maps`*: object; Explicit role to {filename, sha256?}; base_color is required<br>`normal_convention`: string (['OPENGL'])<br>`height_distance`: number | - |
 | `restore_agent_material` | Restore the named mesh's material slot from the most recent assistant PBR application in this live file session. Refuses changed graphs, maps, destinations or copied geometry. A mesh copy created to isolate a shared mesh stays isolated. Restores only while the original data still exists; unavailable after load, undo, redo or extension disable. | `object_name`*: string | - |
 | `import_agent_environment` | Apply an assistant-supplied equirectangular PNG/JPEG/EXR/Radiance HDR from the local inbox to the current scene. Requires actual 2:1 dimensions, at least 4x2, at most 32 megapixels and 128 MiB. Packs the image and creates a separate Environment Texture World. The previous World stays untouched and can be restored in this live file session. Repeat unchanged input and strength reuses it. Dimensions do not establish correct panorama projection, seams or high dynamic range. | `filename`*: string<br>`sha256`: string<br>`strength`: number | - |
 | `restore_agent_environment` | Restore the previous World after the most recent assistant environment application in this live file session. Refuses an edited or replaced World or image. Unavailable after load, undo, redo or extension disable. | none | - |
+
+### Saved local results
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `save_agent_result` | Save chosen inbox assets in a durable local library for discovery and reuse after Blender or the chat restarts. Supply a title, kind and files with required SHA-256 digests. Files are copied before publishing the record: at most 128 files and 512 MiB combined. For single files use role asset (default). MATERIAL requires explicit map roles with base_color and optional roughness OR smoothness, metallic, normal, height, ambient_occlusion and edge. MODEL_PACKAGE uses one asset plus resource files; OBJ textures use base_color, normal, roughness or metallic roles. Include every dependency. Saving verifies bytes, names and roles; format decoding and package completeness are checked by the import tool. Optional description is user-supplied provenance, not independently verified. No scene change, automatic scene application, upload or provider request. Identical requests reuse the same intact record. Local copies remain until explicitly removed outside this tool. | `title`*: string<br>`description`: string<br>`kind`*: string (enum: see tools/list)<br>`files`*: array | - |
+| `list_agent_results` | Discover durable local saved results by title, description and kind. Returns paged metadata, stable result_ids and a damaged-record count. Listing validates metadata; inspect_agent_result or prepare_agent_result revalidates file bytes. No scene change. | `offset`: integer<br>`limit`: integer<br>`kind`: string (enum: see tools/list)<br>`search`: string | read-only annotation |
+| `inspect_agent_result` | Inspect a saved local result's title, description, original names, roles and digests. With no preview_file, verify every saved file. With preview_file, verify that named PNG/JPEG/WebP/EXR and return a bounded inline image preview without changing Blender data. Other formats have file details only; this does not claim a rendered model or media preview. | `result_id`*: string<br>`preview_file`: string; Optional image basename in this result | read-only annotation |
+| `prepare_agent_result` | Verify a saved bundle and copy its original names into the assistant inbox for deliberate reuse. Returns an import recipe with required destination choices. Preserves any identical inbox files and refuses collisions with different content; never overwrites a file. All saved files are verified before publication. Does not apply assets, reuse old target identities or authorize a mesh edit. Inspect the current scene and call the import tool explicitly after choosing its destination, placement, axes or media channels. | `result_id`*: string | - |
 
 ### Assistant audio and video
 
@@ -233,8 +264,8 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
-| `export_agent_mesh` | Export exactly one named static editable mesh as a local embedded GLB and return its path, SHA-256, source-world-to-local matrix and session handle. Existing selection is preserved. The source must be local to this scene, in Object Mode, without modifiers, constraints, vertex groups, animation, shape keys, object material overrides or custom mesh properties other than this extension's verified blockout ownership marker. Transform must be invertible and orientation preserving. A new export supersedes this mesh's previous handle; pending handles expire on file load, Undo/Redo and extension disable. Up to 64 pending exports are retained. Edit the exported file with the assistant's available tools, then return a self-contained GLB through the inbox and apply_agent_mesh. This does not invoke a generation service or spend credits. | `object_name`*: string | - |
-| `apply_agent_mesh` | Apply a returned embedded GLB (up to 256 MiB) from the assistant inbox to the exact unchanged target captured by export_agent_mesh. REMESH replaces geometry, UVs and materials; UV replaces active UVs; RETEXTURE replaces UV/material assignments; PARTS replaces the source mesh with 2 to 128 parts parented to the source; RIG attaches a compatible returned armature and weights. UV/RETEXTURE/RIG require matching indexed geometry after the explicit mapping. RIG accepts animation clips but rejects morphs; other policies require static meshes. result_to_source is an explicit orientation-preserving affine 4x4 matrix from returned Blender scene coordinates (after glTF axis conversion) into source-local coordinates. Never guess alignment. keep_original explicitly chooses whether to preserve a separate original object. Success consumes the handle, preserves source transforms/parent/selection, and reports native Undo availability. No separate restore command. On an uncertain failure inspect the scene before exporting again. Works with arbitrary Python execution disabled. | `handle`*: string<br>`filename`*: string; Returned GLB basename in the inbox<br>`sha256`: string<br>`policy`*: string (['REMESH', 'UV', 'RETEXTURE', 'PARTS', 'RIG'])<br>`result_to_source`*: array<br>`keep_original`*: boolean | destructive annotation |
+| `export_agent_mesh` | Export named meshes as a local embedded GLB with SHA-256, coordinate metadata and adjacent manifest. mode EDIT (default) grants a session edit handle for exactly one named static mesh. Its source must be local to this scene, in Object Mode, without modifiers, constraints, vertex groups, animation, shape keys, object material overrides or custom mesh properties other than this extension's verified blockout ownership marker. coordinates WORLD (default) preserves scene placement and requires an invertible orientation-preserving source transform for EDIT. Choose LOCAL to export source-local geometry and edit mirrored or singular sources without changing their transforms; the suggested result_to_source is identity. mode REFERENCE exports evaluated current-frame geometry with supported modifiers, current rig pose and shape keys baked into static meshes. It never grants edit authority or exports animation. Use object_name for one source, or object_names for 1-64 distinct REFERENCE/WORLD sources. WORLD reference geometry bakes transforms, correcting reflected face winding and corner normals. Use LOCAL for a singular reference transform. Realized surface meshes are required; temporary copies are limited to 2,000,000 geometry/attribute components and the GLB to 256 MiB. Selection, active scene, frame and source data are preserved. A new export supersedes this mesh's previous handle; pending handles expire on file load, Undo/Redo and extension disable. Up to 64 pending exports are retained. Edit the exported file with the assistant's available tools. For EDIT, return a self-contained GLB through the inbox and apply_agent_mesh. For REFERENCE, import returned assets separately. No animation retargeting or generation service is invoked. | `object_name`: string<br>`object_names`: array<br>`mode`: string (['EDIT', 'REFERENCE'])<br>`coordinates`: string (['WORLD', 'LOCAL']) | - |
+| `apply_agent_mesh` | Apply a returned embedded GLB (up to 256 MiB) from the assistant inbox to the exact unchanged EDIT target captured by export_agent_mesh. REFERENCE exports cannot be applied in place. A LOCAL export can target a mirrored source because its mapping stays in source-local coordinates; source reflection is not baked into the returned edit. REMESH replaces geometry, UVs and materials; UV replaces active UVs; RETEXTURE replaces UV/material assignments; PARTS replaces the source mesh with 2 to 128 parts parented to the source; RIG attaches a compatible returned armature and weights. UV/RETEXTURE/RIG require matching indexed geometry after the explicit mapping. RIG accepts animation clips but rejects morphs; other policies require static meshes. result_to_source is an explicit orientation-preserving affine 4x4 matrix from returned Blender scene coordinates (after glTF axis conversion) into source-local coordinates. Never guess alignment. keep_original explicitly chooses whether to preserve a separate original object. Success consumes the handle, preserves source transforms/parent/selection, and reports native Undo availability. No separate restore command. On an uncertain failure inspect the scene before exporting again. Works with arbitrary Python execution disabled. | `handle`*: string<br>`filename`*: string; Returned GLB basename in the inbox<br>`sha256`: string<br>`policy`*: string (['REMESH', 'UV', 'RETEXTURE', 'PARTS', 'RIG'])<br>`result_to_source`*: array<br>`keep_original`*: boolean | destructive annotation |
 
 ### Scene blockout
 
@@ -290,7 +321,8 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 | `set_frame` | Move Blender's timeline to a frame and evaluate the scene there. | `frame`*: integer | - |
 | `screenshot_viewport` | Capture the visible 3D viewport area as a PNG image, including its UI overlays. | none | read-only annotation; GUI required |
 | `camera_path` | Build an animated scene camera from a preset, description or explicit waypoints. | `preset`: string<br>`duration`: number; seconds<br>`focal`: number; mm<br>`aim_at_subject`: boolean<br>`description`: string; e.g. 'slow orbit, 8 s, 35mm'<br>`waypoints`: array | - |
-| `render_still` | Capture a quick OpenGL camera or viewport still as a PNG at the requested size. | `source`: string (['CAMERA', 'VIEWPORT'])<br>`width`: integer<br>`height`: integer | read-only annotation; GUI required |
+| `render_still` | Capture a quick OpenGL camera or viewport still as a PNG at the requested size. | `source`: string (['CAMERA', 'VIEWPORT'])<br>`camera_name`: string<br>`width`: integer<br>`height`: integer<br>`grey_clay`: boolean | read-only annotation; GUI required |
+| `snapshot_render_result` | Save the existing Blender Render Result as a verified PNG without starting a render. | none | read-only annotation |
 | `blender_api_help` | Inspect Blender's running Python API before writing a script. | `path`*: string; e.g. bpy.ops.mesh.primitive_cube_add, bpy.types.Object, bpy.data.objects | read-only annotation |
 | `datablocks_summary` | Summarize the datablocks in the open Blender file. | none | read-only annotation |
 <!-- tools:end -->

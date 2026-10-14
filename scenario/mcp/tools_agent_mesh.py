@@ -8,7 +8,12 @@ from .tools_agent import _inbox, _schema
 
 
 def export_agent_mesh(args):
-    return assistant_mesh.export_mesh(args.get("object_name"))
+    return assistant_mesh.export_mesh(
+        args.get("object_name"),
+        object_names=args.get("object_names"),
+        mode=args.get("mode", "EDIT"),
+        coordinates=args.get("coordinates", "WORLD"),
+    )
 
 
 def apply_agent_mesh(args):
@@ -18,24 +23,48 @@ def apply_agent_mesh(args):
 SPECS = [
     ToolSpec(
         "export_agent_mesh",
-        "Export exactly one named static editable mesh as a local embedded GLB and return its "
-        "path, SHA-256, source-world-to-local matrix and session handle. Existing selection is "
-        "preserved. The source must be local to this scene, in Object Mode, without modifiers, "
+        "Export named meshes as a local embedded GLB with SHA-256, coordinate metadata and adjacent manifest. "
+        "mode EDIT (default) grants a session edit handle for exactly one named static mesh. "
+        "Its source must be local to this scene, in Object Mode, without modifiers, "
         "constraints, vertex groups, animation, shape keys, object material overrides or custom "
-        "mesh properties other than this extension's verified blockout ownership marker. Transform "
-        "must be invertible and orientation preserving. A new export "
+        "mesh properties other than this extension's verified blockout ownership marker. "
+        "coordinates WORLD (default) preserves scene placement and requires an invertible orientation-preserving "
+        "source transform for EDIT. Choose LOCAL to export source-local geometry and edit mirrored or singular "
+        "sources without changing their transforms; the suggested result_to_source is identity. "
+        "mode REFERENCE exports evaluated current-frame geometry with supported modifiers, current rig pose "
+        "and shape keys baked into static meshes. It never grants edit authority or exports animation. "
+        "Use object_name for one source, or object_names for 1-64 distinct REFERENCE/WORLD sources. "
+        "WORLD reference geometry bakes transforms, correcting reflected face winding and corner normals. "
+        "Use LOCAL for a singular reference transform. Realized surface meshes are required; temporary copies "
+        "are limited to 2,000,000 geometry/attribute components and the GLB to 256 MiB. "
+        "Selection, active scene, frame and source data are preserved. A new export "
         "supersedes this mesh's previous handle; pending handles expire on file load, Undo/Redo "
         "and extension disable. Up to 64 pending exports are retained. Edit the exported file "
-        "with the assistant's available tools, then return a self-contained GLB through the "
-        "inbox and apply_agent_mesh. This does not invoke a generation service or spend credits.",
-        _schema({"object_name": {"type": "string"}}, ["object_name"]),
+        "with the assistant's available tools. For EDIT, return a self-contained GLB through the "
+        "inbox and apply_agent_mesh. For REFERENCE, import returned assets separately. No animation retargeting "
+        "or generation service is invoked.",
+        _schema(
+            {
+                "object_name": {"type": "string"},
+                "object_names": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "items": {"type": "string"},
+                },
+                "mode": {"type": "string", "enum": ["EDIT", "REFERENCE"], "default": "EDIT"},
+                "coordinates": {"type": "string", "enum": ["WORLD", "LOCAL"], "default": "WORLD"},
+            }
+        ),
         export_agent_mesh,
         {"destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
     ),
     ToolSpec(
         "apply_agent_mesh",
         "Apply a returned embedded GLB (up to 256 MiB) from the assistant inbox to the exact "
-        "unchanged target captured by export_agent_mesh. REMESH replaces geometry, UVs and "
+        "unchanged EDIT target captured by export_agent_mesh. REFERENCE exports cannot be applied in place. "
+        "A LOCAL export can target a mirrored source because its mapping stays in source-local coordinates; "
+        "source reflection is not baked into the returned edit. REMESH replaces geometry, UVs and "
         "materials; UV replaces active UVs; RETEXTURE replaces UV/material assignments; PARTS "
         "replaces the source mesh with 2 to 128 parts parented to the source; RIG attaches a "
         "compatible returned armature and weights. UV/RETEXTURE/RIG require matching indexed "

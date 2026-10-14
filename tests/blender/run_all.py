@@ -27,6 +27,8 @@ BASELINE = (
     "test_provider_setup",
     "test_assistant_mode",
     "test_agent_artifacts",
+    "test_agent_results",
+    "test_agent_still_inputs",
     "test_agent_materials",
     "test_agent_media",
     "test_agent_models",

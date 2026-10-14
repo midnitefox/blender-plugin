@@ -39,6 +39,12 @@ def agent_workspace(args):
             "audio_video": "import_agent_media",
         },
         "generation_provider_required": False,
+        "saved_results": {
+            "save": "save_agent_result",
+            "discover": "list_agent_results",
+            "inspect_preview": "inspect_agent_result",
+            "prepare_reuse": "prepare_agent_result",
+        },
         "instructions": (
             "Use your assistant's own tools to create assets, such as Codex ImageGen for images. "
             "Save or copy the files to this inbox, then call the matching import tool with "
@@ -47,6 +53,9 @@ def agent_workspace(args):
             "or IMAGE to load an image for later work. Use import_agent_material for a PBR map set. "
             "Save the blend file to retain packed images, materials, environments and models. "
             "Audio/video imports retain separate media files; keep those with the project. "
+            "Use save_agent_result to preserve chosen assets in the local results library. "
+            "Find them after restarting with list_agent_results; inspect and prepare them for "
+            "reuse before explicitly importing into the current scene. "
             "This extension cannot invoke your assistant's generation tools itself."
         ),
     }

@@ -4,8 +4,13 @@
 
 import base64
 import contextlib
+import json
 import os
+import shutil
+import struct
 import tempfile
+import threading
+from pathlib import Path
 
 import bpy
 
@@ -172,18 +177,165 @@ def screenshot_viewport(args):
         return _png_content(path)
 
 
+def _still_thread():
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("Capture still images on Blender's main thread")
+
+
+def _still_plan(args):
+    from ..blender.assistant_capture import _integer
+
+    if not isinstance(args, dict) or args.keys() - {
+        "source",
+        "camera_name",
+        "width",
+        "height",
+        "grey_clay",
+    }:
+        raise ValueError("Use the documented still capture options")
+    source = args.get("source", "CAMERA")
+    if source not in {"CAMERA", "VIEWPORT"}:
+        raise ValueError("Choose CAMERA or VIEWPORT still capture")
+    width = _integer(args.get("width", 1280), "Width", 64, 3840)
+    height = _integer(args.get("height", 720), "Height", 64, 2160)
+    grey = args.get("grey_clay", False)
+    if type(grey) is not bool:
+        raise ValueError("grey_clay must be a boolean")
+    scene, camera = bpy.context.scene, None
+    name = args.get("camera_name")
+    if name is not None and (source != "CAMERA" or not isinstance(name, str) or not name):
+        raise ValueError("camera_name must name a camera for CAMERA capture")
+    if source == "CAMERA":
+        camera = (
+            scene.objects.get(name)
+            if name is not None
+            else scene.camera or next((obj for obj in scene.objects if obj.type == "CAMERA"), None)
+        )
+        if camera is None or camera.type != "CAMERA" or camera.name not in scene.objects:
+            raise ValueError("Choose a camera in the current scene")
+    return dict(source=source, camera=camera, width=width, height=height, force_solid=grey)
+
+
+def _still_outbox():
+    from ..blender.assistant_capture import _outbox
+
+    return _outbox()
+
+
+def _still_payload(draw, *, source, expected_size, grey_clay=False, camera=None):
+    from ..blender import preview_decode
+    from ..core.agent_artifacts import read_inbox_image
+    from ..core.jobs.local_render import blender_path
+
+    root = _still_outbox()
+    directory = Path(tempfile.mkdtemp(prefix="still-", dir=root)).resolve()
+    path, preview = directory / "still.png", directory / "preview.png"
+    try:
+        blender_path(path)
+        draw(path)
+        snapshot = read_inbox_image(directory, path.name)
+        if len(snapshot.data) < 24 or snapshot.data[12:16] != b"IHDR":
+            raise RuntimeError("Blender did not produce a usable PNG still")
+        size = struct.unpack_from(">II", snapshot.data, 16)
+        if not all(0 < side <= 8192 for side in size) or size[0] * size[1] > 16_777_216:
+            raise ValueError("Use a still within 8192 pixels per edge and 16 megapixels")
+        if expected_size is not None and size != expected_size:
+            raise RuntimeError("The captured still has unexpected dimensions")
+        preview_size, _ = preview_decode.decode(
+            path, edge=1280, limit=lambda w, h: (w, h) == size, output=preview
+        )
+        inline = read_inbox_image(directory, preview.name, max_bytes=8 * 1024 * 1024)
+        metadata = {
+            "path": str(path),
+            "sha256": snapshot.sha256,
+            "bytes": len(snapshot.data),
+            "width": size[0],
+            "height": size[1],
+            "source": source,
+            "grey_clay": grey_clay,
+            "camera": camera,
+            "preview_width": preview_size[0],
+            "preview_height": preview_size[1],
+            "retained": True,
+            "instructions": "Use the retained full-size PNG with your assistant's image tools. Copy it into your project before removing extension data.",
+        }
+        return [
+            {"type": "text", "text": json.dumps(metadata)},
+            {
+                "type": "image",
+                "data": base64.b64encode(inline.data).decode("ascii"),
+                "mimeType": "image/png",
+            },
+        ]
+    except BaseException:
+        if directory.parent != root:
+            raise RuntimeError("Still cleanup target is outside the assistant outbox") from None
+        shutil.rmtree(directory)
+        raise
+
+
 def render_still(args):
     from ..blender import capture
 
-    with _private_png("render.png") as path:
-        capture.capture_still(
-            bpy.context,
-            path,
-            source=args.get("source", "CAMERA"),
-            width=int(args.get("width", 1280)),
-            height=int(args.get("height", 720)),
+    _still_thread()
+    plan = _still_plan(args)
+    if bpy.app.background:
+        raise RuntimeError("Still capture needs the Blender GUI and an open 3D viewport")
+    if any(value is None for value in capture._view3d(bpy.context)):
+        raise RuntimeError("Open a 3D viewport before capturing a still")
+    old_view = capture._view_context["value"]
+    try:
+        return _still_payload(
+            lambda path: capture.capture_still(bpy.context, path, **plan),
+            source=plan["source"],
+            expected_size=(plan["width"], plan["height"]),
+            grey_clay=plan["force_solid"],
+            camera=plan["camera"].name if plan["camera"] else None,
         )
-        return _png_content(path)
+    finally:
+        capture._view_context["value"] = old_view
+
+
+def snapshot_render_result(args):
+    from ..blender import capture
+
+    _still_thread()
+    if args != {}:
+        raise ValueError("snapshot_render_result takes no options and never starts a render")
+    image = bpy.data.images.get("Render Result")
+    if image is None or image.type != "RENDER_RESULT":
+        raise ValueError("No existing Render Result is available; render an image in Blender first")
+    size = tuple(image.size)
+    if size != (0, 0) and (
+        not all(0 < side <= 8192 for side in size) or size[0] * size[1] > 16_777_216
+    ):
+        raise ValueError("Use a Render Result within 8192 pixels per edge and 16 megapixels")
+
+    # Render Result's RNA size and has_data can remain empty after a completed
+    # native render. save_render reads its native buffer; verify that PNG before
+    # decoding or returning it instead of trusting the lazy RNA fields.
+    def save_existing(path):
+        try:
+            image.save_render(str(path), scene=scene)
+        except RuntimeError:
+            raise ValueError(
+                "No existing Render Result pixels are available; render an image in Blender first"
+            ) from None
+
+    scene = bpy.context.scene
+    saved = capture.RenderSettings.snapshot(scene)
+    try:
+        capture.set_image_output(scene.render, "PNG")
+        settings = scene.render.image_settings
+        settings.color_mode, settings.color_depth, settings.compression = "RGBA", "8", 15
+        scene.render.use_stamp = False
+        return _still_payload(
+            save_existing,
+            source="RENDER_RESULT",
+            expected_size=size if size != (0, 0) else None,
+        )
+    finally:
+        saved.restore(scene)
 
 
 def camera_path(args):
@@ -470,20 +622,37 @@ SPECS = (
             "Capture a quick OpenGL camera or viewport still as a PNG at the requested size.\n"
             "Args:\n"
             "  - source: optional string, CAMERA (default) or VIEWPORT.\n"
-            "  - width: optional integer, default 1280 pixels.\n"
-            "  - height: optional integer, default 720 pixels.\n"
-            "Returns: PNG image content, with temporary capture files cleaned up.\n"
-            'Example: {"source": "CAMERA", "width": 1280, "height": 720}.\n'
+            "  - camera_name: optional camera in the current scene; CAMERA source only.\n"
+            "  - width: optional integer from 64 to 3840, default 1280 pixels.\n"
+            "  - height: optional integer from 64 to 2160, default 720 pixels.\n"
+            "  - grey_clay: optional boolean, default false; capture neutral solid shading.\n"
+            "Returns: inline PNG preview and metadata with the retained full-size path, SHA-256, bytes and dimensions.\n"
+            'Example: {"source": "CAMERA", "width": 1280, "height": 720, "grey_clay": true}.\n'
             "Do not use in background mode: capture needs the GUI and a 3D viewport or raises RuntimeError. Prefer screenshot_viewport to inspect the visible viewport UI.\n"
         ),
         _schema(
             {
                 "source": {"type": "string", "enum": ["CAMERA", "VIEWPORT"]},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
+                "camera_name": {"type": "string"},
+                "width": {"type": "integer", "minimum": 64, "maximum": 3840},
+                "height": {"type": "integer", "minimum": 64, "maximum": 2160},
+                "grey_clay": {"type": "boolean"},
             }
         ),
         render_still,
+        {"readOnlyHint": True},
+    ),
+    ToolSpec(
+        "snapshot_render_result",
+        (
+            "Save the existing Blender Render Result as a verified PNG without starting a render.\n"
+            "Args: none.\n"
+            "Returns: inline PNG preview and metadata with the retained full-size path, SHA-256, bytes and dimensions.\n"
+            "Example: {}.\n"
+            "Uses the current scene's view transform. Requires an existing Render Result within 8192 pixels per edge and 16 megapixels; returns a clear error when none is available. Camera, frame, render and image settings are restored.\n"
+        ),
+        _schema({}),
+        snapshot_render_result,
         {"readOnlyHint": True},
     ),
     ToolSpec(

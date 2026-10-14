@@ -37,6 +37,7 @@ def build_registry():
         tools_agent_mesh,
         tools_agent_models,
         tools_agent_packages,
+        tools_agent_results,
         tools_blender,
     )
 
@@ -54,6 +55,7 @@ def build_registry():
         tools_agent_mesh,
         tools_agent_models,
         tools_agent_packages,
+        tools_agent_results,
         tools_blender,
     ):
         for spec in module.SPECS:

@@ -76,15 +76,19 @@ normal and other PBR maps use the dedicated material handoff below.
 Ask the assistant to create or prepare matching maps, copy them into the inbox,
 and call `import_agent_material` for the exact mesh. The mesh needs UVs and must
 be editable in Object Mode. Supply `base_color` and whichever of `roughness`,
-`metallic`, `normal`, `height` and `ambient_occlusion` are available:
+`smoothness`, `metallic`, `normal`, `height`, `ambient_occlusion` and `edge` are
+available. Supply either roughness or smoothness:
 
 ```json
 {"object_name":"Crate","maps":{"base_color":{"filename":"wood.png"},"roughness":{"filename":"wood-roughness.png"},"normal":{"filename":"wood-normal.png"}}}
 ```
 
-Maps must be PNG, JPEG or WebP with matching dimensions, up to 64 MiB each,
-256 MiB combined and 32 megapixels combined. Base color uses sRGB; data maps
-use Non-Color. Normal maps must use OpenGL tangent space. Height adds bump;
+Maps accept PNG, JPEG, WebP or single-part non-deep scanline EXR with matching
+dimensions and at most 8192 pixels per edge. Limits are 64 MiB per PNG/JPEG/WebP,
+128 MiB per EXR, 256 MiB combined, 32 megapixels combined and 128 million decoded
+channel samples. Base color uses sRGB, including EXR; data maps use Non-Color.
+Smoothness is inverted into roughness. Edge remains a named packed texture node
+for manual wiring. Normal maps must use OpenGL tangent space. Height adds bump;
 it does not change geometry. AO multiplies base color. The tool creates a new
 material in the chosen mesh's active slot and preserves other slots and objects.
 It packs each map into the saved project. Creating accurate, aligned PBR maps
@@ -154,6 +158,18 @@ indexed geometry. The source must be a local static mesh in Object Mode without
 modifiers, constraints, vertex groups, animation, shape keys, object material
 overrides or custom mesh properties. Existing rigs are not retargeted.
 
+For a mirrored source, choose `coordinates: "LOCAL"` when exporting. The result
+uses object-local geometry and an identity initial mapping, preserving the
+source object's reflected transform. Returned edit mappings still require
+explicit orientation-preserving alignment.
+
+For visual or modeling reference, choose `mode: "REFERENCE"`. This snapshots
+evaluated geometry at the current frame, including supported modifiers,
+deformation and shape keys. Supply one `object_name`, or up to 64 `object_names`
+with world coordinates. The response and manifest identify the coordinate
+space and capture frame. Reference exports have no edit handle and cannot be
+passed to `apply_agent_mesh`; import a separately created result deliberately.
+
 Keep the exported source unchanged while the assistant works. File load,
 Undo/Redo, disabling the extension or exporting that mesh again invalidates its
 previous handle. Up to 64 pending exports are kept. The assistant explicitly
@@ -203,6 +219,33 @@ inside the extension's user storage. Keep that file for playback. To move the
 project, copy the retained media alongside the `.blend` and relink its sequencer
 paths. Deleting the original inbox file does not remove the retained copy.
 
+## Save and reuse local results
+
+Ask the assistant to save an asset you want to keep using `save_agent_result`
+while its files are in the inbox. A result has a title, optional description,
+kind and explicit files with their SHA-256 digests. Material maps retain their
+roles; model packages retain their companion files and original filenames.
+Include every dependency. Up to 128 files and 512 MiB can be saved per result.
+Saving checks the file bytes and roles; the import tool separately validates
+format, decoding and package completeness.
+
+`list_agent_results` finds saved results after Blender or the conversation
+restarts. Filter by kind or text and request further pages using `next_offset`.
+`inspect_agent_result` verifies the saved files, or previews a selected PNG,
+JPEG, WebP or EXR. Model, audio and video entries provide file details; image
+previews do not imply a rendered model or a media player.
+
+`prepare_agent_result` verifies the whole bundle and copies it back to the
+inbox without changing the scene. It refuses occupied filenames with different
+content. The assistant then inspects the current project, chooses the target,
+placement, axes or timeline channels, and calls the matching import tool.
+Saved results carry no old mesh-edit handle or automatic replacement permission.
+
+The library is local to this Blender extension profile and retains its own
+copies outside the `.blend` file. Deleting an inbox file does not delete a saved
+result. Keep a backup of assets you need; removing extension user data removes
+the library. No automatic cloud history or synchronization is involved.
+
 ## Local scene and camera tools
 
 Ask the assistant to inspect your scene, describe a named object, select objects,
@@ -211,8 +254,13 @@ camera from a preset, a description or explicit waypoints. Review the resulting
 camera and animation in Blender before saving.
 
 `screenshot_viewport` captures the visible 3D viewport with overlays.
-`render_still` returns a quick OpenGL camera or viewport still at a chosen size.
-Both require the graphical interface and return image content to the assistant.
+`render_still` returns a quick OpenGL camera or viewport still at a chosen size,
+with optional grey clay shading and an explicit camera. Both require the
+graphical interface and return image content to the assistant.
+`snapshot_render_result` copies an existing Render Result without starting a
+new render. Still tools retain a verified PNG in the assistant outbox and return
+an inline preview. A missing Render Result requires rendering first; no render
+is triggered implicitly. Capture settings and the current frame are restored.
 
 `capture_agent_animation` records a silent camera or viewport MP4 for the
 assistant's video tool. It defaults to 1280×720 and accepts up to 1920×1080,

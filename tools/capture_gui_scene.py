@@ -4,6 +4,7 @@
 
 import base64
 import datetime
+import hashlib
 import importlib
 import json
 import os
@@ -118,13 +119,48 @@ def verify_mcp_captures():
         ("render", tools.render_still, {"source": "VIEWPORT", "width": 320, "height": 180}),
     ):
         content = handler(arguments)
-        raw = base64.b64decode(content["_image"], validate=True)
-        if content["mimeType"] != "image/png" or not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        if label == "screenshot":
+            raw, mime = base64.b64decode(content["_image"], validate=True), content["mimeType"]
+            evidence = {"bytes": len(raw), "temporary_directory_removed": True}
+        else:
+            if not isinstance(content, list) or [item.get("type") for item in content] != [
+                "text",
+                "image",
+            ]:
+                raise RuntimeError(
+                    "MCP render did not return retained-output metadata and an image"
+                )
+            metadata = json.loads(content[0]["text"])
+            raw, mime = base64.b64decode(content[1]["data"], validate=True), content[1]["mimeType"]
+            retained = Path(metadata["path"])
+            if (
+                not metadata.get("retained")
+                or not retained.is_file()
+                or not 0 < retained.stat().st_size <= 64 * 1024 * 1024
+            ):
+                raise RuntimeError("MCP render did not retain a bounded PNG file")
+            full = retained.read_bytes()
+            if (
+                len(full) != metadata["bytes"]
+                or hashlib.sha256(full).hexdigest() != metadata["sha256"]
+                or not full.startswith(b"\x89PNG\r\n\x1a\n")
+            ):
+                raise RuntimeError("MCP render retained file failed byte verification")
+            (OUTPUT / "mcp-render-full.png").write_bytes(full)
+            evidence = {
+                "bytes": len(raw),
+                "retained_output_verified": True,
+                "full_size_bytes": len(full),
+                "sha256": metadata["sha256"],
+                "width": metadata["width"],
+                "height": metadata["height"],
+            }
+        if mime != "image/png" or not raw.startswith(b"\x89PNG\r\n\x1a\n"):
             raise RuntimeError(f"MCP {label} did not return a PNG")
         if set(Path(tempfile.gettempdir()).glob("scenario-mcp-*")) != before:
             raise RuntimeError(f"MCP {label} left a temporary capture directory")
         (OUTPUT / f"mcp-{label}.png").write_bytes(raw)
-        results[label] = {"bytes": len(raw), "temporary_directory_removed": True}
+        results[label] = evidence
     return results
 
 

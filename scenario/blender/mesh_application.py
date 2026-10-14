@@ -17,6 +17,7 @@ _ATTRIBUTE_FIELDS = {
     "INT": "value",
     "BOOLEAN": "value",
     "INT8": "value",
+    "INT16_2D": "value",
     "INT32_2D": "value",
     "FLOAT_VECTOR": "vector",
     "FLOAT2": "vector",

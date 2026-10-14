@@ -3,9 +3,12 @@
 """Offline map and panorama handoffs through the installed extension."""
 
 import hashlib
+import struct
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import bpy
 from helpers import reset_scene, submodule
@@ -46,7 +49,11 @@ class AgentMaterialTests(unittest.TestCase):
     def material(self, maps=None):
         if maps is None:
             path = self.image()
-            maps = {role: {"filename": path.name} for role in self.helper.MAP_ROLES}
+            maps = {
+                role: {"filename": path.name}
+                for role in self.helper.MAP_ROLES
+                if role != "smoothness"
+            }
         return self.tools.import_agent_material({"object_name": self.target.name, "maps": maps})
 
     def test_complete_map_graph_colorspaces_shared_mesh_repeat_and_restore(self):
@@ -57,13 +64,15 @@ class AgentMaterialTests(unittest.TestCase):
         other = bpy.data.objects.new("Shared mesh", self.target.data)
         bpy.context.scene.collection.objects.link(other)
         path = self.image()
-        maps = {role: {"filename": path.name} for role in self.helper.MAP_ROLES}
+        maps = {
+            role: {"filename": path.name} for role in self.helper.MAP_ROLES if role != "smoothness"
+        }
         result = self.material(maps)
         material = self.target.active_material
         self.assertEqual(other.active_material, original)
         self.assertEqual(self.target.material_slots[1].material, spare)
         images = {role: bpy.data.images[item["image"]] for role, item in result["maps"].items()}
-        self.assertEqual(len(set(images.values())), 6)
+        self.assertEqual(len(set(images.values())), 7)
         for role, image in images.items():
             self.assertEqual(
                 image.colorspace_settings.name, "sRGB" if role == "base_color" else "Non-Color"
@@ -85,6 +94,151 @@ class AgentMaterialTests(unittest.TestCase):
         self.assertEqual(self.target.active_material, original)
         self.assertEqual(self.target.material_slots[0].link, "DATA")
         self.assertEqual(other.active_material, original)
+
+    def test_exr_smoothness_and_edge_packed_graph_repeat_and_guarded_restore(self):
+        original = bpy.data.materials.new("Original EXR target")
+        self.target.data.materials.append(original)
+        path = self.image("material.exr", file_format="OPEN_EXR")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        maps = {
+            role: {"filename": path.name, "sha256": digest}
+            for role in self.helper.MAP_ROLES
+            if role != "roughness"
+        }
+        result = self.material(maps)
+        material = self.target.active_material
+        nodes = material.node_tree.nodes
+        shader = next(node for node in nodes if node.type == "BSDF_PRINCIPLED")
+        textures = {node.label: node for node in nodes if node.type == "TEX_IMAGE"}
+        invert = shader.inputs["Roughness"].links[0].from_node
+        self.assertEqual(invert.type, "INVERT")
+        self.assertEqual(invert.inputs["Fac"].default_value, 1.0)
+        self.assertEqual(invert.inputs["Color"].links[0].from_node, textures["smoothness"])
+        self.assertFalse(any(socket.is_linked for socket in textures["edge"].outputs))
+        for role, node in textures.items():
+            self.assertEqual(node.inputs["Vector"].links[0].from_node.type, "UVMAP")
+            image = node.image
+            self.assertTrue(image.is_float)
+            self.assertEqual(image.file_format, "OPEN_EXR")
+            self.assertEqual(tuple(image.size), (8, 8))
+            self.assertEqual(
+                image.colorspace_settings.name, "sRGB" if role == "base_color" else "Non-Color"
+            )
+            self.assertEqual(hashlib.sha256(image.packed_file.data).hexdigest(), digest)
+        before = set(bpy.data.materials), set(bpy.data.images)
+        self.assertTrue(self.material(maps)["reused"])
+        self.assertEqual(before, (set(bpy.data.materials), set(bpy.data.images)))
+        textures["edge"].image.colorspace_settings.name = "sRGB"
+        with self.assertRaisesRegex(ValueError, "changed"):
+            self.tools.restore_agent_material({"object_name": self.target.name})
+        textures["edge"].image.colorspace_settings.name = "Non-Color"
+        self.tools.restore_agent_material({"object_name": self.target.name})
+        self.assertEqual(self.target.active_material, original)
+        self.assertNotIn(result["material"], bpy.data.materials)
+        self.assertFalse(
+            any(
+                name.split(".")[0] == "scenario_sdk" or name.endswith(".sdk_adapter")
+                for name in sys.modules
+            )
+        )
+
+    def test_exr_bad_container_and_map_conflicts_refuse_before_decode(self):
+        path = self.image("material.exr", file_format="OPEN_EXR")
+        valid = path.read_bytes()
+        oversized = bytearray(valid)
+        for name in (b"dataWindow", b"displayWindow"):
+            start = oversized.index(name + b"\0box2i\0") + len(name + b"\0box2i\0") + 4
+            struct.pack_into("<i", oversized, start + 8, 8192)
+        before = set(bpy.data.images), set(bpy.data.materials), self.target.data
+        for data in (
+            valid[:-3],
+            valid[:4] + struct.pack("<I", 0x1002) + valid[8:],
+            bytes(oversized),
+            self.image("disguised.png").read_bytes(),
+        ):
+            path.write_bytes(data)
+            with patch.object(self.helper, "_decode_map") as decode, self.assertRaises(ValueError):
+                self.material({"base_color": {"filename": path.name}})
+            decode.assert_not_called()
+            self.assertEqual(
+                before, (set(bpy.data.images), set(bpy.data.materials), self.target.data)
+            )
+        path.write_bytes(valid)
+        with patch.object(self.tools, "read_inbox_file") as read:
+            with self.assertRaisesRegex(ValueError, "either roughness or smoothness"):
+                self.material(
+                    {
+                        role: {"filename": path.name}
+                        for role in ("base_color", "roughness", "smoothness")
+                    }
+                )
+            read.assert_not_called()
+        with self.assertRaisesRegex(ValueError, "supported explicit"):
+            self.material(
+                {"base_color": {"filename": path.name}, "unknown": {"filename": path.name}}
+            )
+
+    def test_exr_limits_and_failed_assignment_leave_no_staged_data(self):
+        path = self.image("material.exr", file_format="OPEN_EXR")
+        maps = {role: {"filename": path.name} for role in ("base_color", "smoothness", "edge")}
+        original = bpy.data.materials.new("Original")
+        self.target.data.materials.append(original)
+        other = bpy.data.objects.new("Unrelated shared mesh", self.target.data)
+        bpy.context.scene.collection.objects.link(other)
+        before = set(bpy.data.images), set(bpy.data.materials), set(bpy.data.meshes)
+        for constant, limit in (
+            ("MAX_FILE_BYTES", len(path.read_bytes()) - 1),
+            ("MAX_MAP_BYTES", 2 * len(path.read_bytes())),
+            ("MAX_PIXELS", 100),
+        ):
+            with (
+                self.subTest(limit=constant),
+                patch.object(self.helper, constant, limit),
+                patch.object(self.helper, "_decode_map") as decode,
+                self.assertRaises(ValueError),
+            ):
+                self.material(maps)
+            decode.assert_not_called()
+        with (
+            patch.object(
+                self.helper, "MaterialHandoff", side_effect=RuntimeError("receipt failure")
+            ),
+            self.assertRaisesRegex(RuntimeError, "receipt failure"),
+        ):
+            self.material(maps)
+        self.assertEqual(
+            before, (set(bpy.data.images), set(bpy.data.materials), set(bpy.data.meshes))
+        )
+        self.assertEqual(self.target.active_material, original)
+        self.assertEqual(self.target.material_slots[0].link, "DATA")
+        self.assertEqual(other.active_material, original)
+        self.assertEqual(other.data, self.target.data)
+        self.target.data.materials.clear()
+        shared_mesh = self.target.data
+        with (
+            patch.object(
+                self.helper, "MaterialHandoff", side_effect=RuntimeError("receipt failure")
+            ),
+            self.assertRaisesRegex(RuntimeError, "receipt failure"),
+        ):
+            self.material(maps)
+        self.assertEqual(
+            before, (set(bpy.data.images), set(bpy.data.materials), set(bpy.data.meshes))
+        )
+        self.assertEqual(self.target.data, shared_mesh)
+        self.assertEqual(other.data, shared_mesh)
+        self.assertFalse(self.target.material_slots)
+
+    def test_existing_jpeg_and_webp_material_maps_keep_working(self):
+        for suffix, file_format in ((".jpg", "JPEG"), (".webp", "WEBP")):
+            with self.subTest(format=file_format):
+                path = self.image("material" + suffix, file_format=file_format)
+                result = self.material({"base_color": {"filename": path.name}})
+                image = bpy.data.images[result["maps"]["base_color"]["image"]]
+                self.assertEqual(image.file_format, file_format)
+                self.assertEqual(tuple(image.size), (8, 8))
+                self.assertTrue(image.packed_file)
+                self.tools.restore_agent_material({"object_name": self.target.name})
 
     def test_empty_shared_mesh_is_copied_and_restored(self):
         original = self.target.data
@@ -176,7 +330,10 @@ class AgentMaterialTests(unittest.TestCase):
             self.tools.restore_agent_material({"object_name": self.target.name})
 
     def test_packed_maps_and_environment_survive_source_removal_save_reopen(self):
-        result = self.material()
+        maps = self.image("saved-material.exr", file_format="OPEN_EXR")
+        result = self.material(
+            {role: {"filename": maps.name} for role in self.helper.MAP_ROLES if role != "roughness"}
+        )
         panorama = self.image("panorama.png", width=16, height=8)
         environment = self.tools.import_agent_environment({"filename": panorama.name})
         expected = {item["image"]: item["sha256"] for item in result["maps"].values()}
@@ -194,6 +351,17 @@ class AgentMaterialTests(unittest.TestCase):
             self.assertEqual(
                 bpy.data.objects[result["object"]].active_material.name, result["material"]
             )
+            material = bpy.data.materials[result["material"]]
+            textures = {
+                node.label: node for node in material.node_tree.nodes if node.type == "TEX_IMAGE"
+            }
+            shader = next(
+                node for node in material.node_tree.nodes if node.type == "BSDF_PRINCIPLED"
+            )
+            self.assertEqual(shader.inputs["Roughness"].links[0].from_node.type, "INVERT")
+            self.assertFalse(any(socket.is_linked for socket in textures["edge"].outputs))
+            self.assertEqual(textures["edge"].image.colorspace_settings.name, "Non-Color")
+            self.assertTrue(textures["base_color"].image.is_float)
             with self.assertRaisesRegex(ValueError, "live file session"):
                 self.tools.restore_agent_environment({})
             reset_scene()

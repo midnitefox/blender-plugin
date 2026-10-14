@@ -39,11 +39,21 @@ are not packed into `.blend` files. Keep them for playback and copy/relink them
 when moving a project. Removing an inbox source or timeline strip does not
 automatically delete this retained media copy.
 
+Saved result bundles retain explicitly selected files, titles and descriptions
+under `assistant-results`. A connected assistant can list their metadata, verify
+files, preview supported images and prepare copies in the inbox for a new import.
+Descriptions are supplied by the assistant or user, not independently verified.
+These copies persist across restarts and inbox cleanup until removed. They are
+local to the extension profile and are not automatically packed into a project,
+uploaded or synchronized. Temporary image-preview files are deleted after use.
+
 Mesh-edit exports contain the named mesh, materials and embedded textures.
+Reference-only exports can include evaluated geometry from several named meshes.
 Their private temporary files and live handles are cleared on file load,
 Undo/Redo, extension disable or superseding export. A connected assistant can
-read the returned path to use the file with its own tools. Animation references
-are silent MP4 files retained under `assistant-outbox`; copy them into the
+read the returned path to use the file with its own tools. Still captures and
+Render Result snapshots are PNGs; animation references are silent MP4 files.
+They are retained under `assistant-outbox`; copy them into the
 project for long-term storage before removing extension data. Blockout recipes
 and revision information persist in the saved `.blend` file. Film scene identities
 and original build recipes also persist there. Film inspection can return these

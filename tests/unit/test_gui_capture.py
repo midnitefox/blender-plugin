@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Capture evidence cannot mask failed GUI setup or a changed installed package."""
 
+import base64
+import hashlib
 import importlib
 import json
 import runpy
@@ -253,3 +255,68 @@ def test_preferences_complete_only_after_assistant_capture(tmp_path, monkeypatch
     else:
         complete.assert_called_once_with()
         assert (tmp_path / "preferences-assistant.png").is_file()
+
+
+@pytest.mark.parametrize(
+    "failure", [None, "old_shape", "missing_file", "digest", "bytes", "not_retained", "mime"]
+)
+def test_mcp_capture_evidence_verifies_retained_still_and_legacy_screenshot(
+    tmp_path, monkeypatch, failure
+):
+    bpy = Mock()
+    bpy.context.preferences.addons = {"fixture.scenario": SimpleNamespace()}
+    monkeypatch.setitem(sys.modules, "bpy", bpy)
+    monkeypatch.setitem(sys.modules, "gpu", Mock())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["blender", "--", str(tmp_path), "scenario", "sidebar", "image", "8", "empty", "blender"],
+    )
+    png = b"\x89PNG\r\n\x1a\nfixture pixels"
+    encoded = base64.b64encode(png).decode("ascii")
+    retained = tmp_path / "retained.png"
+    if failure != "missing_file":
+        retained.write_bytes(png)
+    metadata = {
+        "path": str(retained),
+        "retained": failure != "not_retained",
+        "sha256": "0" * 64 if failure == "digest" else hashlib.sha256(png).hexdigest(),
+        "bytes": len(png) + (failure == "bytes"),
+        "width": 320,
+        "height": 180,
+    }
+    screenshot = {"_image": encoded, "mimeType": "image/png"}
+    render = [
+        {"type": "text", "text": json.dumps(metadata)},
+        {
+            "type": "image",
+            "data": encoded,
+            "mimeType": "image/jpeg" if failure == "mime" else "image/png",
+        },
+    ]
+    tools = SimpleNamespace(
+        screenshot_viewport=Mock(return_value=screenshot),
+        render_still=Mock(return_value=screenshot if failure == "old_shape" else render),
+    )
+    monkeypatch.setitem(sys.modules, "fixture.scenario.mcp.tools_blender", tools)
+    scene = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/capture_gui_scene.py"))
+    if failure:
+        with pytest.raises(RuntimeError, match="MCP render"):
+            scene["verify_mcp_captures"]()
+        assert not (tmp_path / "mcp-render.png").exists()
+    else:
+        evidence = scene["verify_mcp_captures"]()
+        assert evidence["screenshot"] == {"bytes": len(png), "temporary_directory_removed": True}
+        assert evidence["render"] == {
+            "bytes": len(png),
+            "retained_output_verified": True,
+            "full_size_bytes": len(png),
+            "sha256": metadata["sha256"],
+            "width": 320,
+            "height": 180,
+        }
+        for name in ("mcp-screenshot.png", "mcp-render.png", "mcp-render-full.png"):
+            assert (tmp_path / name).read_bytes() == png
+        assert retained.read_bytes() == png
+    tools.screenshot_viewport.assert_called_once_with({})
+    tools.render_still.assert_called_once_with({"source": "VIEWPORT", "width": 320, "height": 180})

@@ -16,6 +16,8 @@ def import_agent_material(args):
         or set(maps) - set(assistant_materials.MAP_ROLES)
     ):
         raise ValueError("Supply base_color and only supported explicit material map roles")
+    if "roughness" in maps and "smoothness" in maps:
+        raise ValueError("Provide either roughness or smoothness, not both")
     if args.get("normal_convention", "OPENGL") != "OPENGL":
         raise ValueError("Supply an OpenGL tangent-space normal map; convert DirectX maps first")
     inbox = _inbox()
@@ -23,7 +25,17 @@ def import_agent_material(args):
     for role, item in maps.items():
         if not isinstance(item, dict) or set(item) - {"filename", "sha256"}:
             raise ValueError("Each map needs a filename and optional sha256")
-        snapshots[role] = read_inbox_image(inbox, item.get("filename", ""), item.get("sha256"))
+        filename = item.get("filename", "")
+        if isinstance(filename, str) and filename.lower().endswith(".exr"):
+            snapshots[role] = read_inbox_file(
+                inbox,
+                filename,
+                item.get("sha256"),
+                suffixes={".exr"},
+                max_bytes=assistant_materials.MAX_FILE_BYTES,
+            )
+        else:
+            snapshots[role] = read_inbox_image(inbox, filename, item.get("sha256"))
     receipt, changed = assistant_materials.apply_material(
         args.get("object_name", ""),
         snapshots,
@@ -46,7 +58,7 @@ def import_agent_material(args):
         "packed": True,
         "reused": not changed,
         "restore_available": True,
-        "notes": "Normal maps use OpenGL tangent space. Height uses bump, without geometric displacement. AO multiplies base color. Restore is available until file load, undo, redo or extension disable, and refuses edited results. A mesh copy needed to isolate a shared mesh stays isolated after restoring its material.",
+        "notes": "Base color is interpreted as sRGB, including EXR; all other maps are Non-Color. Smoothness is inverted into roughness. Normal maps use OpenGL tangent space. Height uses bump, without geometric displacement. AO multiplies base color. Edge stays a named packed texture for manual wiring. Restore is available until file load, undo, redo or extension disable, and refuses edited results. A mesh copy needed to isolate a shared mesh stays isolated after restoring its material.",
     }
 
 
@@ -102,7 +114,7 @@ def _schema(properties, required=()):
 SPECS = [
     ToolSpec(
         "import_agent_material",
-        "Apply an assistant-created PBR map set from the local inbox to one named editable mesh with UVs. Supply base_color and explicit optional roughness, metallic, normal, height and ambient_occlusion roles, each with filename and optional sha256. Maps must be PNG/JPEG/WebP with matching dimensions. Creates a new packed material in the active slot while preserving other objects and slots. Base color is sRGB; other maps are Non-Color. Normal uses OpenGL tangent space; height uses bump; AO multiplies base color. Repeating an unchanged set in this session reuses it. Does not create maps or establish their physical accuracy.",
+        "Apply an assistant-created PBR map set from the local inbox to one named editable mesh with UVs. Supply base_color and explicit optional roughness OR smoothness, metallic, normal, height, ambient_occlusion and edge roles, each with filename and optional sha256. Maps accept PNG/JPEG/WebP or single-part non-deep scanline EXR, with matching dimensions and at most 8192 pixels per edge. Limits: 64 MiB per PNG/JPEG/WebP, 128 MiB per EXR, 256 MiB combined bytes, 32 megapixels combined and 128 million decoded channel samples. Creates a new packed material in the active slot while preserving other objects and slots. Base color is interpreted as sRGB including EXR; other maps are Non-Color. Smoothness is inverted into Roughness; Normal uses OpenGL tangent space; height uses bump; AO multiplies base color; edge remains a named packed node for manual wiring. Repeating an unchanged set in this session reuses it. Does not create maps or establish their physical accuracy.",
         _schema(
             {
                 "object_name": {"type": "string"},
@@ -120,6 +132,15 @@ SPECS = [
                             "additionalProperties": False,
                         },
                         "roughness": {
+                            "type": "object",
+                            "properties": {
+                                "filename": {"type": "string"},
+                                "sha256": {"type": "string"},
+                            },
+                            "required": ["filename"],
+                            "additionalProperties": False,
+                        },
+                        "smoothness": {
                             "type": "object",
                             "properties": {
                                 "filename": {"type": "string"},
@@ -156,6 +177,15 @@ SPECS = [
                             "additionalProperties": False,
                         },
                         "ambient_occlusion": {
+                            "type": "object",
+                            "properties": {
+                                "filename": {"type": "string"},
+                                "sha256": {"type": "string"},
+                            },
+                            "required": ["filename"],
+                            "additionalProperties": False,
+                        },
+                        "edge": {
                             "type": "object",
                             "properties": {
                                 "filename": {"type": "string"},

@@ -26,6 +26,7 @@ def test_committed_reference_matches_all_registered_source_contracts():
     assert {Path(path).name for _, path in generator.GROUPS} == {
         "tools_agent.py",
         "tools_agent_materials.py",
+        "tools_agent_results.py",
         "tools_agent_media.py",
         "tools_agent_models.py",
         "tools_agent_packages.py",

@@ -15,6 +15,7 @@ GROUPS = (
         "scenario/mcp/tools_agent.py",
     ),
     ("Assistant materials and environments", "scenario/mcp/tools_agent_materials.py"),
+    ("Saved local results", "scenario/mcp/tools_agent_results.py"),
     ("Assistant audio and video", "scenario/mcp/tools_agent_media.py"),
     ("Assistant models", "scenario/mcp/tools_agent_models.py"),
     ("Model packages and point clouds", "scenario/mcp/tools_agent_packages.py"),
