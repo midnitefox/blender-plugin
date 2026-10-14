@@ -1,7 +1,9 @@
 # Validation and local commands
 
-See [the environment reference](../../CONTRIBUTING.md#environment-variables) for
-developer credentials and explicit live commands.
+The active assistant runtime needs no generation credentials. Use isolated
+native assistant tests for its current behavior. The
+[environment reference](../../CONTRIBUTING.md#environment-variables) also retains
+explicit upstream service-maintenance commands; those are outside normal setup.
 
 Use the uv version required by `pyproject.toml`. Run `uv sync --locked` to create
 the worktree's `.venv` from `uv.lock` and the interpreter in `.python-version`.
@@ -383,7 +385,7 @@ not establish published release-pair compatibility or public update availability
 - Smoke tests, generation, prompt helpers and scene design can spend credits.
   Do not run them as part of a documentation command.
 
-Use `blender --background scene.blend --command scenario_blender` for local MCP.
+Use `blender --background scene.blend --command open_studio` for local MCP.
 Set `SCENARIO_BLENDER_TOKEN` for an explicit token, or use the generated session
 token shown at startup. Online access must be enabled; SIGINT/SIGTERM stop the
 server cleanly. Run it only in the isolated development profile described above.

@@ -1,11 +1,49 @@
 # Runtime map and integration status
 
-The extension package is [scenario/](../../scenario/). It uses the scoped SDK runtime for generation and recovery, alongside retained
-local helpers and separately tested application components.
+Open Studio is an assistant-only extension. Generation takes place in the
+connected assistant's tools; Blender accepts local assets and performs scene
+operations. The source package remains [scenario/](../../scenario/), while the
+installed extension id and headless command are `open_studio`.
 The supported minimum in the [manifest](../../scenario/blender_manifest.toml)
 is Blender 5.0; dependency and runtime acceptance have separate gates.
 
-## Active entry points
+## Current assistant entry points
+
+- [registry.py](../../scenario/blender/registry.py) registers the compact
+  assistant UI, connection setup, camera tools and local asset lifecycle hooks.
+  It does not register the upstream composer, model forms or cloud jobs.
+- [runtime.py](../../scenario/blender/runtime.py) owns local connection and
+  filesystem state. [prefs.py](../../scenario/prefs.py) stores the loopback port,
+  optional Python permission and logging level. No generation credentials are
+  part of this runtime.
+- [assistant_loop.py](../../scenario/blender/assistant_loop.py) processes local
+  MCP requests and pending file-modified marks on Blender's main thread.
+- [mcp_service.py](../../scenario/blender/mcp_service.py) builds the active tool
+  registry, manages authenticated loopback transport and writes a private
+  connection file for the bundled stdio client. The `open_studio` command
+  provides a blocking queue pump for background Blender.
+- [tools_agent.py](../../scenario/mcp/tools_agent.py) exposes the bounded inbox
+  and image handoff. Dedicated modules handle PBR maps, panoramic Worlds,
+  models, point clouds, media, mesh edits, blockouts and animated captures.
+  [The current MCP reference](../MCP.md) is generated from that registry.
+- [agent_artifacts.py](../../scenario/core/agent_artifacts.py) verifies bounded
+  local file snapshots. Image and supported model resources are packed;
+  audio/video remains in retained external files. Operations preserve unrelated
+  scene data and reject stale targets or protected edits.
+
+Retained SDK and service modules are not active registration dependencies.
+Reusing a local helper must not import those modules transitively. Native
+assistant tests check the registered tools and loaded modules in an isolated
+installed package. Full film orchestration and animation retargeting remain
+unfinished; asset import alone does not establish creative workflow parity.
+
+## Historical upstream implementation
+
+The remainder records the inherited service architecture for source maintenance.
+Its credentials, SDK sessions, service operations and release assumptions do not
+describe the active Open Studio build or authorize restoring service setup.
+
+### Historical entry points
 
 - **Registration** ([registry.py](../../scenario/blender/registry.py)): Registers
   properties, panels, operators, composer, pump and local server integration. The
@@ -125,7 +163,7 @@ clients see.
 - Build, installation and isolation are owned by [tools/](../../tools/) and
   [Makefile](../../Makefile), not a second packaging path.
 
-## Acceptance boundaries
+## Historical upstream acceptance boundaries
 
 0.10.0 delivered consolidated adoption, the shared runtime and the views. The
 open checks, fixes and decisions are in

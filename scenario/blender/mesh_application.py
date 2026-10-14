@@ -38,7 +38,7 @@ def _present(collection, value):
     return any(item is value for item in collection)
 
 
-def _validate_object(scene, obj):
+def _validate_object(scene, obj, *, allowed_mesh_properties=()):
     if not _present(bpy.data.scenes, scene) or not _present(scene.objects, obj):
         raise MeshApplicationError("Use a live object in the explicit originating scene")
     if obj.type != "MESH" or obj.mode != "OBJECT":
@@ -57,7 +57,7 @@ def _validate_object(scene, obj):
         raise MeshApplicationError("Vertex-parented children require another policy")
     if any(slot.link != "DATA" for slot in obj.material_slots):
         raise MeshApplicationError("Object material overrides require another policy")
-    if obj.data.keys():
+    if any((key, obj.data[key]) not in allowed_mesh_properties for key in obj.data.keys()):
         raise MeshApplicationError("Custom mesh properties require another policy")
 
 
@@ -114,6 +114,9 @@ def _fingerprint(mesh):
     add(tuple((layer.name, layer.active_render, layer.active_clone) for layer in mesh.uv_layers))
     add(mesh.uv_layers.active_index)
     add((mesh.use_auto_texspace, mesh.texspace_location, mesh.texspace_size, mesh.use_fake_user))
+    # Opted-in source markers are part of identity, including their exact value.
+    # Default callers still reject all custom properties before fingerprinting.
+    add(tuple((key, mesh[key]) for key in sorted(mesh.keys())))
     return digest.digest()
 
 
@@ -142,13 +145,14 @@ class MeshTarget:
     mesh_name: str
     geometry: bytes = field(repr=False)
     context: tuple = field(repr=False)
+    allowed_mesh_properties: tuple = field(default=(), repr=False)
 
 
-def capture_target(scene, obj):
+def capture_target(scene, obj, *, allowed_mesh_properties=()):
     """Freeze an explicit source before asynchronous work; never infer selection."""
     _main_thread()
     try:
-        _validate_object(scene, obj)
+        _validate_object(scene, obj, allowed_mesh_properties=allowed_mesh_properties)
         if (
             scene != bpy.context.scene
             or not scene.is_editable
@@ -176,7 +180,14 @@ def capture_target(scene, obj):
             obj.active_material_index,
         )
         return MeshTarget(
-            scene, obj, obj.data, obj.name, obj.data.name, _fingerprint(obj.data), context
+            scene,
+            obj,
+            obj.data,
+            obj.name,
+            obj.data.name,
+            _fingerprint(obj.data),
+            context,
+            tuple(allowed_mesh_properties),
         )
     except (ReferenceError, AttributeError):
         raise MeshApplicationError("The source mesh was removed or replaced") from None
@@ -184,7 +195,13 @@ def capture_target(scene, obj):
 
 def validate_target(target):
     """Reject changed identity, geometry, transforms, parenting or memberships."""
-    if not isinstance(target, MeshTarget) or capture_target(target.scene, target.obj) != target:
+    if (
+        not isinstance(target, MeshTarget)
+        or capture_target(
+            target.scene, target.obj, allowed_mesh_properties=target.allowed_mesh_properties
+        )
+        != target
+    ):
         raise MeshApplicationError("The source mesh changed; review it again")
 
 
@@ -319,6 +336,7 @@ class MeshApplication:
     _before_name: str = field(repr=False)
     _before_hash: bytes = field(repr=False)
     _applied_hash: bytes = field(repr=False)
+    _allowed_mesh_properties: tuple = field(default=(), repr=False)
     _closed: bool = field(default=False, repr=False)
 
     def _release_holder(self):
@@ -381,7 +399,11 @@ class MeshApplication:
             raise MeshApplicationError("This application receipt is already finalized")
         try:
             try:
-                _validate_object(self._scene, self.source)
+                _validate_object(
+                    self._scene,
+                    self.source,
+                    allowed_mesh_properties=self._allowed_mesh_properties,
+                )
             except MeshApplicationError as exc:
                 raise MeshApplicationError(
                     f"Target structure changed; rollback requires explicit review: {exc}"
@@ -409,7 +431,16 @@ class MeshApplication:
         self._closed = True
 
 
-def apply_mesh(scene, source, result, *, policy, result_to_source, keep_original=False):
+def apply_mesh(
+    scene,
+    source,
+    result,
+    *,
+    policy,
+    result_to_source,
+    keep_original=False,
+    allowed_mesh_properties=(),
+):
     """Apply one explicit imported mesh in source-local coordinates.
 
     REMESH adopts result geometry, materials and UVs. UV preserves source mesh
@@ -425,7 +456,7 @@ def apply_mesh(scene, source, result, *, policy, result_to_source, keep_original
         raise MeshApplicationError(
             "Use an explicit REMESH/UV/RETEXTURE policy and boolean Keep original"
         )
-    _validate_object(scene, source)
+    _validate_object(scene, source, allowed_mesh_properties=allowed_mesh_properties)
     _validate_object(scene, result)
     if source is result or source.data is result.data:
         raise MeshApplicationError("Use a separate imported result mesh")
@@ -433,10 +464,16 @@ def apply_mesh(scene, source, result, *, policy, result_to_source, keep_original
     _fingerprint(source.data)
     _fingerprint(result.data)
     staged = _stage(source.data, result.data, policy, mapping)
-    return _replace_mesh(scene, source, staged, keep_original=keep_original)
+    return _replace_mesh(
+        scene,
+        source,
+        staged,
+        keep_original=keep_original,
+        allowed_mesh_properties=allowed_mesh_properties,
+    )
 
 
-def _replace_mesh(scene, source, staged, *, keep_original):
+def _replace_mesh(scene, source, staged, *, keep_original, allowed_mesh_properties=()):
     """Publish an already validated private mesh; caller owns non-mesh changes."""
     before = source.data
     before_active = source.active_material_index
@@ -468,6 +505,7 @@ def _replace_mesh(scene, source, staged, *, keep_original):
             before.name,
             before_hash,
             applied_hash,
+            tuple(allowed_mesh_properties),
         )
     except BaseException:
         if staged is not None and source.data is staged:

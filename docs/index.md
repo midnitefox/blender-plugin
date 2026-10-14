@@ -6,6 +6,7 @@ Use the current assistant-only guides for installation and everyday work:
 - [User guide](USER_GUIDE.md)
 - [Local MCP setup, tools and security](MCP.md)
 - [Privacy and data handling](PRIVACY.md)
+- [Assistant runtime and retained-source boundaries](architecture/runtime.md)
 - [Support](../SUPPORT.md)
 
 The active workflow is assistant-created asset handoff and local Blender
@@ -23,7 +24,6 @@ guides above for setup and supported features.
 - [Inherited known limitations](KNOWN_LIMITATIONS.md)
 ### Architecture and implementation
 
-- [Runtime map and integration status](architecture/runtime.md)
 - [Blender boundaries and scene application](architecture/blender.md)
 - [SDK adoption and operation contracts](SDK_ADOPTION.md)
 - [Dependency bundle and supported artifacts](SDK_BUNDLE.md)

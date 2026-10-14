@@ -17,6 +17,10 @@ GROUPS = (
     ("Assistant materials and environments", "scenario/mcp/tools_agent_materials.py"),
     ("Assistant audio and video", "scenario/mcp/tools_agent_media.py"),
     ("Assistant models", "scenario/mcp/tools_agent_models.py"),
+    ("Model packages and point clouds", "scenario/mcp/tools_agent_packages.py"),
+    ("Mesh editing", "scenario/mcp/tools_agent_mesh.py"),
+    ("Scene blockout", "scenario/mcp/tools_agent_blockout.py"),
+    ("Animation captures", "scenario/mcp/tools_agent_capture.py"),
     ("Scene tools (run on Blender's main thread)", "scenario/mcp/tools_blender.py"),
 )
 

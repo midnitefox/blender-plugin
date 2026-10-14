@@ -26,18 +26,26 @@ SERVER_INFO = {"name": "open-studio", "version": __version__}
 def build_registry():
     from ..mcp import (
         tools_agent,
+        tools_agent_blockout,
+        tools_agent_capture,
         tools_agent_materials,
         tools_agent_media,
+        tools_agent_mesh,
         tools_agent_models,
+        tools_agent_packages,
         tools_blender,
     )
 
     registry = protocol.Registry()
     for module in (
         tools_agent,
+        tools_agent_blockout,
+        tools_agent_capture,
         tools_agent_materials,
         tools_agent_media,
+        tools_agent_mesh,
         tools_agent_models,
+        tools_agent_packages,
         tools_blender,
     ):
         for spec in module.SPECS:

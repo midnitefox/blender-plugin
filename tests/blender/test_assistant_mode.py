@@ -33,6 +33,14 @@ ASSISTANT_TOOLS = {
     "restore_agent_environment",
     "import_agent_media",
     "import_agent_model",
+    "import_agent_model_package",
+    "import_agent_splat",
+    "export_agent_mesh",
+    "apply_agent_mesh",
+    "blockout_plan",
+    "build_agent_blockout",
+    "clear_agent_blockout",
+    "capture_agent_animation",
 }
 
 

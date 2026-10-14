@@ -34,6 +34,8 @@ def agent_workspace(args):
             "material_maps": "import_agent_material",
             "environment": "import_agent_environment",
             "model": "import_agent_model",
+            "model_package": "import_agent_model_package",
+            "point_cloud": "import_agent_splat",
             "audio_video": "import_agent_media",
         },
         "generation_provider_required": False,

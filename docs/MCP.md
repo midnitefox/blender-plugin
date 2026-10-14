@@ -82,8 +82,37 @@ handoffs accept optional SHA-256 verification and reject paths outside the inbox
 
 The plugin cannot invoke the assistant's generation tools or access their
 accounts. A generated image supplies pixels; model creation, accurate PBR maps,
-rigging and other outputs require suitable assistant capabilities. Mesh editing,
-animation retargeting, blockout and full film orchestration remain unfinished.
+rigging and other outputs require suitable assistant capabilities. Animation
+retargeting and full film orchestration remain unfinished. The local
+mesh-edit round trip, structured blockout and animated-reference capture are
+available through dedicated tools below.
+
+## Modeling, scene design and video references
+
+`import_agent_model_package` accepts glTF/OBJ with explicit resources,
+embedded-texture FBX and mesh PLY. Resources are copied from the same bounded
+inbox and rewritten into a private package snapshot. Inspect returned dropped
+references and FBX timing warnings. `import_agent_splat` decodes SPZ v2/v3,
+Gaussian PLY or `.splat` on a worker, then publishes an approximate colored point
+cloud only if the original scene is still current. These imports create new
+groups each time; inspect after an interrupted call before retrying.
+
+`export_agent_mesh` returns a named static mesh's GLB, digest, mapping and live
+target handle. `apply_agent_mesh` requires that handle, a returned inbox GLB,
+an explicit REMESH/UV/RETEXTURE/PARTS/RIG policy, a verified affine mapping and
+the `keep_original` choice. Source identity and content must remain unchanged.
+Successful or uncertain application consumes the handle; file load, Undo/Redo
+and disable clear pending exports. See each tool schema for source restrictions.
+
+`blockout_plan` returns the saved recipe, revision, planning guidance and limits.
+`build_agent_blockout` accepts a complete recipe and current revision for a
+replacement. `clear_agent_blockout` requires the current revision. Both guard
+owned content against edits, sharing and outside references before removal.
+
+`capture_agent_animation` produces a silent MP4 in a unique retained outbox
+directory. It requires the GUI, validates actual decoded timing and dimensions,
+and restores capture settings on success or failure. The assistant must copy
+the clip for long-term storage and use its own video tools for generation.
 
 ## Security model
 
@@ -159,6 +188,34 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
 | `import_agent_model` | Import a self-contained GLB 2.0 created by the connected assistant's modeling tools. Copy it to agent_workspace's inbox and pass its basename. Maximum 256 MiB; external file or URL references are refused. Meshes, hierarchy, materials, packed textures, rigs, skin weights, shape keys and animation clips are retained. A new group is placed with its frame-zero bottom center at the explicit location, or the current 3D cursor. Existing selection, current frame, timeline range and scene frame rate stay unchanged. Rigged imports require a Blender window context. This imports an existing generated model; it does not generate or rig one. Every call creates another group; inspect the scene after an interrupted call before retrying. Arbitrary Python execution may stay off. | `filename`*: string; GLB basename in the inbox<br>`sha256`: string; Optional SHA-256 of the GLB<br>`location`: array; World-space bottom-center location; defaults to the 3D cursor<br>`name`: string | - |
+
+### Model packages and point clouds
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `import_agent_model_package` | Import an assistant-created glTF, OBJ, embedded-texture FBX or mesh PLY from the local inbox. List glTF buffers/images and OBJ MTL/texture maps explicitly in resources; copy all files into the flat inbox. OBJ texture images require base_color, normal, roughness or metallic role. Max 128 files, 256 MiB per file, 512 MiB total; glTF JSON max 8 MiB and MTL max 4 MiB. Local references are rewritten into a private snapshot. Textures are packed. FBX textures must be embedded with portable relative paths without traversal; expanded FBX arrays max 512 MiB. FBX/OBJ/PLY and rigged glTF require a Blender window. Existing selection/timing is preserved. Inspect returned dropped_references and frame_rate_mismatch. Each call creates a new group; inspect before retrying. | `filename`*: string<br>`sha256`: string<br>`resources`: array<br>`location`: array<br>`name`: string | - |
+| `import_agent_splat` | Import assistant-created SPZ v2-v3, Gaussian PLY or .splat as a colored point cloud. Copy the file into the local inbox. Max 256 MiB, 20 million source points, 2 million retained points. Choose OPENGL or OPENCV source axes; defaults are OPENGL for SPZ and OPENCV for PLY/.splat. This is a point-cloud approximation, without Gaussian anisotropy or view-dependent color. SPZ v1 and v4 are unsupported. Each call creates a new group at location or cursor; inspect before retrying. | `filename`*: string<br>`sha256`: string<br>`max_points`: integer<br>`axes`: string (['OPENGL', 'OPENCV'])<br>`location`: array<br>`name`: string | - |
+
+### Mesh editing
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `export_agent_mesh` | Export exactly one named static editable mesh as a local embedded GLB and return its path, SHA-256, source-world-to-local matrix and session handle. Existing selection is preserved. The source must be local to this scene, in Object Mode, without modifiers, constraints, vertex groups, animation, shape keys, object material overrides or custom mesh properties other than this extension's verified blockout ownership marker. Transform must be invertible and orientation preserving. A new export supersedes this mesh's previous handle; pending handles expire on file load, Undo/Redo and extension disable. Up to 64 pending exports are retained. Edit the exported file with the assistant's available tools, then return a self-contained GLB through the inbox and apply_agent_mesh. This does not invoke a generation service or spend credits. | `object_name`*: string | - |
+| `apply_agent_mesh` | Apply a returned embedded GLB (up to 256 MiB) from the assistant inbox to the exact unchanged target captured by export_agent_mesh. REMESH replaces geometry, UVs and materials; UV replaces active UVs; RETEXTURE replaces UV/material assignments; PARTS replaces the source mesh with 2 to 128 parts parented to the source; RIG attaches a compatible returned armature and weights. UV/RETEXTURE/RIG require matching indexed geometry after the explicit mapping. RIG accepts animation clips but rejects morphs; other policies require static meshes. result_to_source is an explicit orientation-preserving affine 4x4 matrix from returned Blender scene coordinates (after glTF axis conversion) into source-local coordinates. Never guess alignment. keep_original explicitly chooses whether to preserve a separate original object. Success consumes the handle, preserves source transforms/parent/selection, and reports native Undo availability. No separate restore command. On an uncertain failure inspect the scene before exporting again. Works with arbitrary Python execution disabled. | `handle`*: string<br>`filename`*: string; Returned GLB basename in the inbox<br>`sha256`: string<br>`policy`*: string (['REMESH', 'UV', 'RETEXTURE', 'PARTS', 'RIG'])<br>`result_to_source`*: array<br>`keep_original`*: boolean | destructive annotation |
+
+### Scene blockout
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `blockout_plan` | Inspect the current scene's saved assistant blockout recipe, revision and edit safety. Also returns supported primitives, categories, colors, size limits and planning guidance. Use the connected assistant's reasoning to design or refine a complete recipe from the user's request. Reads local state without changing geometry. | none | read-only annotation |
+| `build_agent_blockout` | Build a complete assistant-designed primitive blockout in its own collection. Creates category-colored boxes, cylinders, thin-box planes, wedges, cones and spheres, grouped by label, with explicit center positions, full XYZ sizes and optional XYZ rotation_degrees. Each element requires a stable unique id. Refinement replaces the entire saved recipe and requires its current expected_revision from blockout_plan. Validates and stages the whole plan before replacing pristine owned content. Refuses user edits, shared data and external references; preserves unrelated scene content. Identical plans with the current revision reuse the existing build. The recipe and revision persist in the blend file. | `plan`*: object<br>`expected_revision`: string; Required for replacing an existing blockout; read blockout_plan first | destructive annotation |
+| `clear_agent_blockout` | Remove only the current scene's pristine owned blockout and its saved recipe. Requires the current expected_revision from blockout_plan. Refuses user-edited, shared or externally referenced objects, meshes, materials and collections, preserving them for manual review. Unrelated scene content stays intact. | `expected_revision`*: string | destructive annotation |
+
+### Animation captures
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `capture_agent_animation` | Capture a silent local MP4 reference from the scene camera or 3D viewport for your assistant's own video tool. Requires Blender's GUI and an open 3D viewport. Choose a camera_name for CAMERA, or use the active/first scene camera. Supply both start_frame and end_frame, or use the current preview/scene range. Captures are limited to 20 seconds, 600 frames and 1920x1080; width and height must be even. grey_clay requests solid single-color shading. The original camera, frame, range, rendering and viewport settings are restored. Returns a unique retained outbox path, SHA-256 and clip timing. Copy the MP4 to your project for long-term storage. This does not generate video. | `source`: string (['CAMERA', 'VIEWPORT'])<br>`camera_name`: string; Camera in the current scene<br>`start_frame`: integer<br>`end_frame`: integer<br>`width`: integer<br>`height`: integer<br>`grey_clay`: boolean | read-only annotation; GUI required |
 
 ### Scene tools (run on Blender's main thread)
 

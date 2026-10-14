@@ -1,5 +1,22 @@
 # Releases
 
+## Open Studio fork status
+
+The current fork produces a development preview with extension id `open_studio`
+and archives named `open_studio-X.Y.Z.zip`. Use the current [user guide](USER_GUIDE.md)
+for installation and [validation guide](development/validation.md) for isolated
+package checks. The inherited release workflow explicitly runs only in
+`scenario-labs/blender-plugin`; it does not publish this fork or configure an
+Open Studio update repository. Stable release publication remains separate,
+authorized work after acceptance.
+
+## Historical upstream release procedure
+
+The remaining procedure describes Scenario's original extension identity,
+accounts, infrastructure and releases. Its domains, commands, service release
+requirements and fixed `scenario` id apply to that upstream project. They must
+not be used as Open Studio setup or publication instructions.
+
 ## Versioning and authorization
 
 The maintainer merges release PRs and authorizes publication. Merging a release

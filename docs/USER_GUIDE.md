@@ -126,6 +126,58 @@ project to retain the model. Each call creates a new group; after an interrupted
 call, inspect the scene before retrying. Creating, remeshing or rigging a model
 requires suitable assistant tools; this handoff imports their finished result.
 
+For glTF or OBJ packages, ask the assistant to use `import_agent_model_package`
+and list every buffer, material file and texture in `resources`. Copy all files
+into the flat inbox. OBJ maps need explicit `base_color`, `normal`, `roughness`
+or `metallic` roles. The same tool imports embedded-texture FBX and mesh PLY.
+Limits are 128 files, 256 MiB per file and 512 MiB total; glTF JSON is limited to
+8 MiB and MTL to 4 MiB. FBX/OBJ/PLY need a Blender window. Review reported dropped
+OBJ references and any FBX frame-rate mismatch before using imported animation.
+
+`import_agent_splat` accepts SPZ v2/v3, Gaussian PLY and `.splat`, up to 256 MiB
+and 20 million source points. It keeps up to two million points and lets the
+assistant choose source axes. The result is an approximate colored point cloud;
+Gaussian shape, rotations and view-dependent color are not reproduced. SPZ v1
+and v4 are unsupported. The points remain in the saved `.blend` file.
+
+## Edit a mesh through the assistant
+
+Ask the assistant to inspect and export the exact mesh using `export_agent_mesh`.
+It receives a local GLB, its fingerprint and a session handle tied to that object.
+The assistant edits the file with its available tools, returns the GLB through
+the inbox, and calls `apply_agent_mesh` with an explicit operation and coordinate
+mapping. It must verify alignment before applying the result.
+
+Supported operations are remesh, UV replacement, retexture, splitting into parts
+and compatible rig attachment. UV, retexture and rig attachment require matching
+indexed geometry. The source must be a local static mesh in Object Mode without
+modifiers, constraints, vertex groups, animation, shape keys, object material
+overrides or custom mesh properties. Existing rigs are not retargeted.
+
+Keep the exported source unchanged while the assistant works. File load,
+Undo/Redo, disabling the extension or exporting that mesh again invalidates its
+previous handle. Up to 64 pending exports are kept. The assistant explicitly
+chooses whether to retain a separate original. Successful application consumes
+the handle and reports native Undo availability. Inspect the scene after an
+uncertain failure before exporting again.
+
+## Design and refine a blockout
+
+For example, ask: "Lay out a small courtyard with a fountain, covered walkway
+and two seating areas, then leave room for a camera to orbit it."
+
+The assistant calls `blockout_plan`, designs a complete recipe using boxes,
+cylinders, planes, wedges, cones and spheres, and submits it to
+`build_agent_blockout`. Elements have explicit categories, colors, names and
+transforms. A recipe can contain up to 200 elements. The extension saves the
+recipe and revision with the project so it can be inspected after reopening.
+
+For refinement, the assistant reads that saved recipe and submits the full
+updated version with its current revision. Rebuild and `clear_agent_blockout`
+affect only the owned collection. They refuse stale revisions, manual edits,
+shared data or external references. Preserve such edits before replacing the
+blockout; the tools do not force-delete them.
+
 ## Add audio or video to the timeline
 
 The assistant copies WAV, MP3, OGG, MP4 or WebM into the inbox and calls
@@ -156,7 +208,20 @@ camera and animation in Blender before saving.
 `screenshot_viewport` captures the visible 3D viewport with overlays.
 `render_still` returns a quick OpenGL camera or viewport still at a chosen size.
 Both require the graphical interface and return image content to the assistant.
-They do not export a finished video.
+
+`capture_agent_animation` records a silent camera or viewport MP4 for the
+assistant's video tool. It defaults to 1280×720 and accepts up to 1920×1080,
+20 seconds and 600 frames. Supply both start/end frames or use the current
+preview/scene range. Grey clay is optional. The tool restores the original
+camera, current frame, timeline range, render and viewport settings, then
+validates the produced clip's actual dimensions and timing. It returns a
+retained outbox path; copy the clip to the project for long-term storage.
+The assistant can process this reference using its available video tools and
+bring the finished clip back through `import_agent_media`.
+
+The mesh-edit workflow also accepts primitives made by `build_agent_blockout`.
+After a mesh edit, blockout refinement and clearing refuse to replace that
+changed content. Preserve the edited objects before starting a new blockout.
 
 ## Python permission
 

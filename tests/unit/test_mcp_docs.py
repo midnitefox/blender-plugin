@@ -28,6 +28,10 @@ def test_committed_reference_matches_all_registered_source_contracts():
         "tools_agent_materials.py",
         "tools_agent_media.py",
         "tools_agent_models.py",
+        "tools_agent_packages.py",
+        "tools_agent_mesh.py",
+        "tools_agent_blockout.py",
+        "tools_agent_capture.py",
         "tools_blender.py",
     }
     assert "generate" not in names and "estimate_cost" not in names

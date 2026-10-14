@@ -15,7 +15,8 @@ send those tool results to its own service as part of your conversation.
 
 Connect only clients you authorize to work on that project. Dedicated tools can
 also change selection, the frame, the scene camera, materials, World, imported
-models and timeline media. Stopping
+models, blockout geometry and timeline media. Explicit mesh-edit tools can
+replace geometry, UVs, materials or rigging on a captured target. Stopping
 the local server prevents further MCP requests.
 
 ## Asset handoff and local storage
@@ -37,6 +38,14 @@ under the extension's user directory and referenced by sequencer strips. They
 are not packed into `.blend` files. Keep them for playback and copy/relink them
 when moving a project. Removing an inbox source or timeline strip does not
 automatically delete this retained media copy.
+
+Mesh-edit exports contain the named mesh, materials and embedded textures.
+Their private temporary files and live handles are cleared on file load,
+Undo/Redo, extension disable or superseding export. A connected assistant can
+read the returned path to use the file with its own tools. Animation references
+are silent MP4 files retained under `assistant-outbox`; copy them into the
+project for long-term storage before removing extension data. Blockout recipes
+and revision information persist in the saved `.blend` file.
 
 ## The local MCP server
 

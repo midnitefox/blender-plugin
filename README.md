@@ -11,8 +11,9 @@ It retains the upstream GPL license and copyright notices.
 asset handoff for images, PBR map sets, panoramic environments, models and
 audio/video. Full creative feature parity with the upstream extension is
 incomplete. The assistant creates assets with its available tools; the extension
-imports the supplied results. Mesh editing, animation retargeting, blockout and
-film orchestration still need dedicated assistant workflows.
+imports the supplied results. Structured blockout, mesh-edit round trips and
+animated reference captures are also available. Animation retargeting and full
+film orchestration remain unfinished.
 
 ## Install and connect
 
@@ -60,6 +61,8 @@ Use the same local inbox and ask the assistant to choose the matching tool:
 | PBR material | `import_agent_material` applies supplied base color and optional roughness, metallic, normal, height and AO maps to one named UV mesh. |
 | Environment | `import_agent_environment` applies a supplied 2:1 equirectangular PNG, JPEG, EXR or Radiance HDR to the World. |
 | Model | `import_agent_model` imports a self-contained GLB, retaining supported materials, textures, rigs and animation data. |
+| Model package | `import_agent_model_package` imports glTF/OBJ with explicit dependencies, embedded-texture FBX or mesh PLY. |
+| Point cloud | `import_agent_splat` imports SPZ v2/v3, Gaussian PLY or `.splat` as approximate colored points. |
 | Audio or video | `import_agent_media` adds WAV, MP3, OGG, MP4 or WebM to explicitly chosen sequencer channels and frames. |
 
 Material images, environments and model textures are packed into the saved
@@ -76,6 +79,18 @@ the timeline, build a camera path, and capture a viewport or quick camera still.
 Captures require Blender's graphical interface. Arbitrary Python execution is
 separately controlled by **Allow connected assistants to run Python** and is off by
 default. The image handoff and dedicated scene tools work with that option off.
+
+For scene design, the assistant can turn a description into a categorized
+primitive blockout, refine its saved recipe and rebuild its owned collection.
+Manual edits and unrelated objects are protected by revision and content checks.
+For mesh edits, it exports a named supported static mesh, works on that snapshot
+with its own tools, and applies a returned GLB with an explicit remesh, UV,
+retexture, parts or rig policy. The original target must remain unchanged.
+
+`capture_agent_animation` creates a silent MP4 camera or viewport reference,
+up to 20 seconds and 1920×1080, with optional grey clay shading. It restores
+camera, frame and capture settings afterward. The assistant can use that clip
+with its own video tools and import the result back into the timeline.
 
 For an isolated headless session, the extension registers:
 

@@ -37,7 +37,8 @@ An external assistant such as Codex connects through authenticated local MCP,
 creates assets with its own tools and hands local files to Blender through a
 bounded local inbox. The active extension offers scene inspection and editing,
 camera paths, captures, image references, PBR map application, panoramic Worlds,
-model import and audio/video strips.
+model/package and point-cloud import, audio/video strips, structured blockout,
+mesh-edit round trips and animated reference capture.
 Python execution is a separate explicit opt-in.
 
 The active registration has no direct generation provider, service credential
