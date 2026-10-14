@@ -178,7 +178,7 @@ class PromptJobs:
                     if item.phase == "QUOTING":
                         self._binding(item, item.scene)
                         item.quote = self.session.deliver(completion, lambda value, *_: value)
-                        item.cost = str(item.quote.estimate.cost)
+                        item.cost = item.quote.estimate.approval_amount
                         item.phase = "READY"
                         continue
                     if item.phase == "READING":

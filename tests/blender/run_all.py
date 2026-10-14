@@ -22,6 +22,10 @@ sys.path.insert(0, str(HERE))
 from blender_env import inspect_zip, sha256, verify_installed  # noqa: E402
 
 BASELINE = (
+    "test_provider_setup",
+    "test_provider_costs",
+    "test_mcp_panel",
+    "test_agent_artifacts",
     "test_upload_transfers",
     "test_upload_store",
     "test_credentials",
@@ -186,6 +190,14 @@ def install_network_guard():
     return violations
 
 
+def load_suite(loader, suite_name, selected_tests):
+    if selected_tests:
+        return loader.loadTestsFromNames(selected_tests)
+    if suite_name == "all":
+        return loader.discover(str(HERE), pattern="test_*.py")
+    return loader.loadTestsFromNames(BASELINE)
+
+
 def main():
     # No real-profile opt-out: contributors should always use the runner.
     raw_profile = os.environ.get("BLENDER_USER_RESOURCES")
@@ -206,6 +218,7 @@ def main():
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--report", type=pathlib.Path, required=True)
     parser.add_argument("--suite", choices=("baseline", "all"), required=True)
+    parser.add_argument("--test", action="append", default=[])
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
     if args.zip.resolve().parent != profile.parent or sha256(args.zip) != args.sha256:
         raise RuntimeError("Candidate ZIP identity mismatch")
@@ -229,10 +242,7 @@ def main():
     helpers.configure(package, installed, profile)
     print(f"Verified installed package: {package}; ZIP SHA-256: {args.sha256}", flush=True)
     loader = unittest.TestLoader()
-    if args.suite == "all":
-        suite = loader.discover(str(HERE), pattern="test_*.py")
-    else:
-        suite = loader.loadTestsFromNames(BASELINE)
+    suite = load_suite(loader, args.suite, args.test)
     result = unittest.TextTestRunner(verbosity=2, resultclass=PromptResult).run(suite)
     # Byte equality and module origins must still hold after tests execute.
     if sha256(args.zip) != args.sha256:
@@ -260,7 +270,8 @@ def main():
         json.dumps(
             {
                 "success": success,
-                "suite": args.suite,
+                "suite": "focused" if args.test else args.suite,
+                "selected_tests": args.test,
                 "tests_run": result.testsRun,
                 "failures": len(result.failures),
                 "errors": len(result.errors),

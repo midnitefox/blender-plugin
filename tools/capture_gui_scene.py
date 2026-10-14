@@ -11,6 +11,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+import tomllib
 import traceback
 from pathlib import Path
 
@@ -21,6 +22,8 @@ OUTPUT, INSTALLED, VIEW, LANE, DELAY, FIXTURE, CAPTURE_BACKEND = sys.argv[
     sys.argv.index("--") + 1 :
 ]
 OUTPUT = Path(OUTPUT)
+EXTENSION_ID = Path(INSTALLED).name
+DISPLAY_NAME = "Open Studio"
 FAILED = False
 
 
@@ -50,12 +53,15 @@ def guarded(callback):
 
 
 def prepare():
+    global DISPLAY_NAME
+
+    DISPLAY_NAME = tomllib.loads((Path(INSTALLED) / "blender_manifest.toml").read_text())["name"]
     print("Capture GPU:", gpu.platform.backend_type_get(), gpu.platform.renderer_get(), flush=True)
     if bpy.app.online_access or os.environ.get("SCENARIO_GUI_PROBE") != "1":
         raise RuntimeError("Capture requires offline mode and the GUI probe guard")
     if VIEW == "composer" and LANE == "audio":
         raise RuntimeError("The composer has no audio lane")
-    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("." + EXTENSION_ID))
     module = importlib.import_module(name)
     if Path(module.__file__).resolve().parent != Path(INSTALLED).resolve():
         raise RuntimeError("Extension loaded outside verified installation")
@@ -66,6 +72,7 @@ def prepare():
     # created by the ordinary GUI pump. These credentials are deliberately fake.
     runtime.prefs().output_dir = str(OUTPUT / "profile" / "outputs")
     if FIXTURE == "form":
+        runtime.prefs().provider_mode = "SCENARIO"
         runtime.prefs().api_key = runtime.prefs().api_secret = "offline-screenshot-fixture"
         catalog = importlib.import_module(name + ".core.api.catalog")
         handlers = importlib.import_module(name + ".blender.handlers")
@@ -120,7 +127,7 @@ def select():
             # draw. Blender keeps the dynamic category property read-only until
             # that draw has populated its enum items.
             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
-            region.active_panel_category = "Scenario"
+            region.active_panel_category = DISPLAY_NAME
             region.tag_redraw()
             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
     area.tag_redraw()
@@ -149,7 +156,7 @@ def capture_x11(destination):
 
 def verify_mcp_captures():
     """Exercise installed capture handlers in the real GUI without service calls."""
-    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("." + EXTENSION_ID))
     tools = importlib.import_module(name + ".mcp.tools_blender")
     before = set(Path(tempfile.gettempdir()).glob("scenario-mcp-*"))
     results = {}
@@ -170,10 +177,17 @@ def verify_mcp_captures():
 
 def capture_credential_preferences(window, area, complete):
     """Wait for each preference layout to draw before capturing its native window."""
-    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+    name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("." + EXTENSION_ID))
     prefs = bpy.context.preferences.addons[name].preferences
     runtime = importlib.import_module(name + ".blender.runtime")
-    sources = iter((("PREFERENCES", True), ("ENVIRONMENT", False)))
+    sources = iter(
+        (
+            ("AGENT", "PREFERENCES", False, "assistant"),
+            ("SCENARIO", "PREFERENCES", True, "preferences"),
+            ("SCENARIO", "ENVIRONMENT", False, "environment"),
+        )
+    )
+    original_mode = prefs.provider_mode
     area.type = "PREFERENCES"
     with bpy.context.temp_override(window=window, area=area):
         bpy.ops.preferences.addon_show(module=name)
@@ -183,16 +197,18 @@ def capture_credential_preferences(window, area, complete):
         selection = next(sources, None)
         if selection is None:
             prefs.credential_source = "PREFERENCES"
+            prefs.provider_mode = original_mode
             complete()
             return
-        source, valid = selection
+        mode, source, valid, capture_name = selection
+        prefs.provider_mode = mode
         prefs.credential_source = source
         if runtime.credentials().valid != valid:
             raise RuntimeError("Credential source did not select the expected offline pair")
         area.tag_redraw()
 
         def capture_selected():
-            destination = OUTPUT / f"preferences-{source.lower()}.png"
+            destination = OUTPUT / f"preferences-{capture_name}.png"
             with bpy.context.temp_override(window=window, area=area):
                 if CAPTURE_BACKEND == "blender":
                     if bpy.ops.screen.screenshot(filepath=str(destination)) != {"FINISHED"}:
@@ -241,11 +257,11 @@ def capture_extension_permissions(window, area, report):
     with bpy.context.temp_override(window=window, area=area):
         bpy.context.preferences.active_section = "EXTENSIONS"
         wm = bpy.context.window_manager
-        wm.extension_search = "Scenario"
+        wm.extension_search = DISPLAY_NAME
         wm.extension_type = "ALL"
         wm.extension_show_panel_installed = True
         wm.extension_show_panel_available = False
-        bpy.ops.extensions.package_show_set(pkg_id="scenario", repo_index=index)
+        bpy.ops.extensions.package_show_set(pkg_id=EXTENSION_ID, repo_index=index)
         area.tag_redraw()
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
     # Metal needs a real event-loop turn after changing editor type; an immediate
@@ -280,7 +296,7 @@ def capture():
         or lane_state.model_key != "model_offline-screenshot"
     ):
         raise RuntimeError("Synthetic fixture model is not selected")
-    if VIEW == "sidebar" and (region.width <= 1 or region.active_panel_category != "Scenario"):
+    if VIEW == "sidebar" and (region.width <= 1 or region.active_panel_category != DISPLAY_NAME):
         raise RuntimeError("Scenario sidebar is not active")
     with bpy.context.temp_override(window=window, area=area):
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
@@ -295,7 +311,11 @@ def capture():
     active_sidebar = region.active_panel_category
 
     report = {
-        "credential_captures": ["preferences-preferences.png", "preferences-environment.png"],
+        "credential_captures": [
+            "preferences-assistant.png",
+            "preferences-preferences.png",
+            "preferences-environment.png",
+        ],
         "mcp_captures": mcp_captures,
         "blender_version": list(bpy.app.version),
         "blender": bpy.app.version_string,

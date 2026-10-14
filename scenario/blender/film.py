@@ -11,7 +11,7 @@ from bpy.props import CollectionProperty, EnumProperty, IntProperty, PointerProp
 from bpy_extras.io_utils import ImportHelper
 
 from ..core.jobs.upload_store import UploadState
-from ..core.ui.costs import format_cu
+from ..core.ui.costs import format_approved_cost
 from . import (
     film_capture_controls,
     film_case_study_controls,
@@ -154,7 +154,7 @@ class SCENARIO_OT_approve_film(bpy.types.Operator):
 
     def draw(self, context):
         self.layout.label(text=f"Task: {self.task_label}")
-        self.layout.label(text=f"Exact price: {self.approved_cost} CU")
+        self.layout.label(text=f"Cost: {format_approved_cost(self.approved_cost)}")
         self.layout.label(text="One submission. Results stay saved for explicit application.")
 
     def execute(self, context):
@@ -251,7 +251,7 @@ class SCENARIO_PT_film(bpy.types.Panel):
     bl_label = "Film"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
+    bl_category = "Open Studio"
     bl_options = {"DEFAULT_CLOSED"}
     bl_order = 20
 
@@ -291,7 +291,9 @@ class SCENARIO_PT_film(bpy.types.Panel):
             row = box.row()
             row.scale_y = 1.5
             op = row.operator(
-                "scenario.approve_film", text=f"Generate ({format_cu(item.cost)} CU)", icon="PLAY"
+                "scenario.approve_film",
+                text=f"Generate ({format_approved_cost(item.cost)})",
+                icon="PLAY",
             )
             op.quote_id, op.approved_cost = item.identifier, item.cost
             box.operator("scenario.discard_film_quote", icon="X").quote_id = item.identifier

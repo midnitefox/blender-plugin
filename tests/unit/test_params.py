@@ -26,6 +26,30 @@ def spec_by_name(schema, name):
     return next(s for s in schema.specs if s.name == name)
 
 
+def test_provider_integer_and_enum_use_native_controls_and_request_values():
+    model = ModelRecord.from_api(
+        {
+            "id": "configured",
+            "inputs": [
+                {"name": "count", "type": "integer", "min": 1, "max": 4, "default": 1},
+                {"name": "quality", "type": "string", "enum": ["low", "high"]},
+                {"name": "frames", "type": "integer", "enum": [85, 129], "default": 129},
+                {"name": "legacy", "allowedValues": ["original"], "enum": ["ignored"]},
+            ],
+        },
+        provider="fal",
+    )
+    schema = parse_schema(model)
+    count = schema.by_name("count")
+    assert count.ptype == "number" and count.is_integer and count.step == 1
+    assert schema.by_name("quality").allowed_values == ("low", "high")
+    assert schema.by_name("frames").allowed_values == (85, 129)
+    assert schema.by_name("legacy").allowed_values == ("original",)
+    assert build_body(
+        schema.specs, {"count": 2.0, "frames": "85", "quality": "high"}, files={}
+    ) == {"count": 2, "frames": 85, "quality": "high"}
+
+
 def test_parse_patina_schema():
     schema = parse_schema(record("model_patina-material"))
     assert schema.prompt_name == "prompt"

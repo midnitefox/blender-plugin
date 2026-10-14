@@ -104,7 +104,7 @@ def _on_estimate(result):
             lane_state.estimate_error = result.error
         else:
             lane_state.estimate_state = "READY"
-            lane_state.estimate_cu = float(result.cu_cost)
+            lane_state.estimate_cu = float(result.cu_cost) if result.cu_cost is not None else -1.0
             lane_state.estimate_error = ""
             runtime.state.estimates[result.key] = result.quote
     except ReferenceError:

@@ -51,6 +51,7 @@ class ReferenceRule:
     kind: str
     required: bool = False
     max_count: int = 1
+    array: bool = False
 
 
 @dataclass(frozen=True)
@@ -152,8 +153,79 @@ PANORAMA_MODELS = tuple(CONTRACTS)
 SIZE_PRESETS = tuple(dict.fromkeys(size for c in CONTRACTS.values() for size in c.sizes))
 
 
-def contract_for(model_id):
-    return CONTRACTS.get(model_id)
+def contract_for(model_id, record=None):
+    """Legacy verified contracts or an explicitly selected provider declaration.
+
+    Provider contracts currently cover declared equirectangular LDR generation
+    and still-to-panorama workflows. Model names, dimensions and capabilities
+    alone cannot confer panorama eligibility. Raw service dictionaries carry no
+    trusted provider provenance and therefore cannot activate this path.
+    """
+    legacy = CONTRACTS.get(model_id)
+    if legacy is not None:
+        return legacy
+    from ..api.catalog import ModelRecord
+
+    if not isinstance(record, ModelRecord) or record.id != model_id:
+        return None
+    declaration = record.provider_contract.get("panorama")
+    lanes = record.provider_contract.get("lanes")
+    if (
+        not isinstance(declaration, dict)
+        or not isinstance(lanes, list)
+        or "panorama" not in lanes
+        or declaration.get("projection") != "equirectangular"
+        or declaration.get("output") != "ldr"
+        or declaration.get("mode") not in {GENERATE, FROM_IMAGE}
+    ):
+        return None
+    definitions = record.parameters
+    if not isinstance(definitions, list) or any(not isinstance(item, dict) for item in definitions):
+        return None
+    by_name = {item.get("name"): item for item in definitions if isinstance(item.get("name"), str)}
+    if len(by_name) != len(definitions):
+        return None
+    references = declaration.get("references", [])
+    if not isinstance(references, list) or len(references) > 16:
+        return None
+    rules, seen = [], set()
+    for reference in references:
+        if not isinstance(reference, dict):
+            return None
+        name = reference.get("parameter")
+        if not isinstance(name, str) or name not in by_name or name in seen:
+            return None
+        spec = by_name[name]
+        kind, count = reference.get("kind"), reference.get("max", 1)
+        required = reference.get("required", False)
+        if (
+            kind not in {STILL, PANORAMA}
+            or type(required) is not bool
+            or type(count) is not int
+            or not 1 <= count <= 16
+            or spec.get("type") not in {"file", "file_array"}
+            or spec.get("kind", "image") != "image"
+            or (spec.get("type") == "file" and count != 1)
+            or (spec.get("required") is True and not required)
+        ):
+            return None
+        maximum = spec.get("maxLength", spec.get("max_length"))
+        if maximum is not None and (type(maximum) is not int or maximum < count):
+            return None
+        rules.append(ReferenceRule(name, kind, required, count, array=spec["type"] == "file_array"))
+        seen.add(name)
+    image_fields = {
+        name
+        for name, spec in by_name.items()
+        if spec.get("type") in {"file", "file_array"} and spec.get("kind", "image") == "image"
+    }
+    if image_fields != seen:
+        return None
+    if declaration["mode"] == FROM_IMAGE and not any(
+        rule.required and rule.kind == STILL for rule in rules
+    ):
+        return None
+    return PanoramaContract(model_id, declaration["mode"], "ldr", references=tuple(rules))
 
 
 def reference_rule(contract, param):
@@ -199,7 +271,7 @@ def models_for_mode(mode, records):
     return [
         record
         for record in records
-        if (contract := CONTRACTS.get(record.id)) is not None and contract.mode == mode
+        if (contract := contract_for(record.id, record)) is not None and contract.mode == mode
     ]
 
 
@@ -267,7 +339,7 @@ def _drifted(contract, by_name):
         return True
     for rule in contract.references:
         spec = by_name[rule.param]
-        expected = "file_array" if rule.max_count > 1 else "file"
+        expected = "file_array" if rule.array or rule.max_count > 1 else "file"
         if spec.ptype != expected or (spec.kind or "image") != "image":
             return True
     for name, value in (*contract.locked, *contract.defaults):

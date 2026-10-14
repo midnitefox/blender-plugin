@@ -50,6 +50,30 @@ def workflow_loop_warning(loop_steps):
     )
 
 
+def quote_cost_fields(estimate):
+    """Preserve unknown external billing instead of inventing a free CU quote."""
+    known = estimate.cost is not None
+    label = f"{format_cu(estimate.cost)} CU" if known else "Provider billed; price unavailable"
+    if not known:
+        custom = estimate.details.get("cost_label")
+        if isinstance(custom, str) and custom.strip() and len(custom) <= 160:
+            label = custom
+    return {
+        "cu_cost": float(estimate.cost) if known else None,
+        "cu_cost_exact": str(estimate.cost) if known else None,
+        "approved_cost": estimate.approval_amount,
+        "provider_billed": not known,
+        "cost_label": label,
+    }
+
+
+def format_approved_cost(value):
+    """Human label for a review token; the token itself is never a numeric price."""
+    if value is None or value == "provider-billed":
+        return "Cost not quoted; provider charges may apply"
+    return f"{format_cu(value)} CU"
+
+
 def workflow_quote_notice(loop_steps):
     """Structured MCP fields for the same warning; approval stays unchanged."""
     return {

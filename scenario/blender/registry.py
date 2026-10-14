@@ -31,6 +31,7 @@ def _modules():
         popover,
         prompt_tools,
         props,
+        provider_setup,
         reference_form,
         result_media,
         result_previews,
@@ -53,6 +54,7 @@ def _modules():
         result_previews,
         shot_planner,
         operators,
+        provider_setup,
         job_recovery,
         workflow_steps,
         reference_form,
@@ -121,7 +123,7 @@ def register():
         )
     except (AttributeError, ValueError, RuntimeError) as err:
         log.warning("CLI command %r not registered: %s", mcp_service.CLI_COMMAND, err)
-    log.info("Scenario for Blender registered")
+    log.info("Open Studio registered")
 
 
 def unregister():
@@ -141,7 +143,7 @@ def unregister():
     for cls in reversed(prefs.CLASSES):
         bpy.utils.unregister_class(cls)
     runtime.shutdown()
-    log.info("Scenario for Blender unregistered")
+    log.info("Open Studio unregistered")
     global _log_handler
     if _log_handler is not None:
         log.removeHandler(_log_handler)

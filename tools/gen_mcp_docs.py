@@ -10,6 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 START, END = "<!-- tools:start -->", "<!-- tools:end -->"
 GROUPS = (
+    (
+        "Assistant image tools (local, no generation provider required)",
+        "scenario/mcp/tools_agent.py",
+    ),
     ("Scene tools (run on Blender's main thread)", "scenario/mcp/tools_blender.py"),
     ("Scenario tools", "scenario/mcp/tools_scenario.py"),
 )

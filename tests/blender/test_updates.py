@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Installed update controls use native operators and never bypass offline mode."""
+"""Independent fork updates open its own release page without repository changes."""
 
 import unittest
 from types import SimpleNamespace
@@ -11,64 +11,34 @@ from helpers import submodule
 
 
 class UpdateTests(unittest.TestCase):
-    def test_supported_native_operator_contracts(self):
-        setup = bpy.ops.preferences.extension_repo_add.get_rna_type().properties
-        for name in ("name", "remote_url", "use_sync_on_startup"):
-            self.assertIn(name, setup)
-        self.assertIn("repo_index", bpy.ops.extensions.repo_sync.get_rna_type().properties)
-        self.assertIn("section", bpy.ops.screen.userpref_show.get_rna_type().properties)
-
-    def test_offline_controls_reject_setup_and_sync(self):
+    def test_offline_controls_reject_opening_releases(self):
         self.assertFalse(bpy.app.online_access)
         self.assertFalse(bpy.ops.scenario.setup_updates.poll())
         self.assertFalse(bpy.ops.scenario.check_updates.poll())
 
-    def test_existing_repository_is_reused_and_disabled_repository_can_be_enabled(self):
+    def test_update_actions_open_only_fork_releases(self):
         updates = submodule("blender.updates")
-        repository = SimpleNamespace(
-            use_remote_url=True, remote_url=updates.REPOSITORY_URL, enabled=False
-        )
-        context = SimpleNamespace(
-            preferences=SimpleNamespace(extensions=SimpleNamespace(repos=[repository]))
-        )
-        native_setup = Mock(side_effect=AssertionError("Duplicate repository created"))
+        opener = Mock(return_value={"FINISHED"})
         fake_bpy = SimpleNamespace(
             app=SimpleNamespace(online_access=True),
-            ops=SimpleNamespace(preferences=SimpleNamespace(extension_repo_add=native_setup)),
+            ops=SimpleNamespace(scenario=SimpleNamespace(open_url=opener)),
         )
+        operator = SimpleNamespace(report=Mock())
         with patch.object(updates, "bpy", fake_bpy):
-            operator = SimpleNamespace(report=Mock())
-            self.assertEqual(
-                updates.SCENARIO_OT_setup_updates.execute(operator, context), {"FINISHED"}
-            )
-            self.assertEqual(
-                updates.SCENARIO_OT_setup_updates.execute(operator, context), {"FINISHED"}
-            )
-        self.assertTrue(repository.enabled)
-        native_setup.assert_not_called()
-
-    def test_check_targets_only_official_repository_without_installing(self):
-        updates = submodule("blender.updates")
-        official = SimpleNamespace(
-            use_remote_url=True, remote_url=updates.REPOSITORY_URL, enabled=True
-        )
-        other = SimpleNamespace(use_remote_url=True, remote_url="https://example.invalid/")
-        context = SimpleNamespace(
-            preferences=SimpleNamespace(extensions=SimpleNamespace(repos=[other, official]))
-        )
-        sync = Mock(return_value={"FINISHED"})
-        fake_bpy = SimpleNamespace(
-            app=SimpleNamespace(online_access=True, background=True),
-            ops=SimpleNamespace(extensions=SimpleNamespace(repo_sync=sync)),
-        )
-        operator = SimpleNamespace(poll=updates.SCENARIO_OT_check_updates.poll)
-        with patch.object(updates, "bpy", fake_bpy):
-            self.assertEqual(
-                updates.SCENARIO_OT_check_updates.execute(operator, context), {"FINISHED"}
-            )
-            sync.assert_called_once_with("EXEC_DEFAULT", repo_index=1)
+            for cls in (updates.SCENARIO_OT_setup_updates, updates.SCENARIO_OT_check_updates):
+                self.assertEqual(cls.execute(operator, None), {"FINISHED"})
             fake_bpy.app.online_access = False
             self.assertEqual(
-                updates.SCENARIO_OT_check_updates.execute(operator, context), {"CANCELLED"}
+                updates.SCENARIO_OT_check_updates.execute(operator, None), {"CANCELLED"}
             )
-            self.assertEqual(sync.call_count, 1)
+        self.assertEqual(opener.call_count, 2)
+        opener.assert_called_with(url="https://github.com/midnitefox/blender-plugin/releases")
+
+    def test_preferences_draw_fork_links_without_configuring_a_repository(self):
+        updates = submodule("blender.updates")
+        layout = Mock()
+        updates.draw(layout, bpy.context)
+        operators = layout.box.return_value.operator.call_args_list
+        self.assertTrue(operators)
+        self.assertTrue(all(call.args[0] == "scenario.open_url" for call in operators))
+        self.assertEqual(updates.GUIDE_URL, "https://github.com/midnitefox/blender-plugin")

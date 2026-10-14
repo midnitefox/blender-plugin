@@ -5,6 +5,7 @@
 import importlib.util
 import json
 import os
+import runpy
 import subprocess
 import sys
 import zipfile
@@ -24,7 +25,11 @@ def archive(path, extra=None):
         z.writestr("__init__.py", "# fixture")
         z.writestr("LICENSE", "fixture license")
         if extra:
-            z.writestr(*extra)
+            entry = zipfile.ZipInfo()
+            # ZipInfo's constructor normalizes backslashes on Windows. Preserve
+            # malicious input exactly as another operating system can write it.
+            entry.filename = extra[0]
+            z.writestr(entry, extra[1])
     return path
 
 
@@ -392,8 +397,9 @@ def test_candidate_minimum_is_checked_before_validation(
 
 
 @pytest.mark.parametrize("failure,keep", [(False, False), (False, True), (True, False)])
+@pytest.mark.parametrize("selection", [[], ["test_provider_setup", "test_agent_artifacts"]])
 def test_staging_cleanup_keeps_artifacts_and_failure_diagnostics(
-    tmp_path, monkeypatch, runner, failure, keep
+    tmp_path, monkeypatch, runner, failure, keep, selection
 ):
     monkeypatch.setattr(runner, "find_blender", lambda _: Path("blender"))
     monkeypatch.setattr(runner, "normal_profile_root", lambda: tmp_path / "normal")
@@ -418,6 +424,11 @@ def test_staging_cleanup_keeps_artifacts_and_failure_diagnostics(
                 for member in ("blender_manifest.toml", "LICENSE", "__init__.py"):
                     archive.write(ROOT / "scenario" / member, member)
         elif name == "tests":
+            command = args[1]
+            actual = [
+                command[index + 1] for index, value in enumerate(command) if value == "--test"
+            ]
+            assert actual == selection
             if failure:
                 raise subprocess.CalledProcessError(7, "tests")
             candidate = next(directory.glob("*.zip"))
@@ -439,6 +450,7 @@ def test_staging_cleanup_keeps_artifacts_and_failure_diagnostics(
         blender=None,
         artifacts=tmp_path / "artifacts",
         suite="baseline",
+        test=selection,
         timeout=2,
         keep_profile=keep,
         expected_version=None,
@@ -452,3 +464,19 @@ def test_staging_cleanup_keeps_artifacts_and_failure_diagnostics(
     assert (directory / "result.json").is_file()
     assert (directory / "tests.log").is_file()
     assert len(list(directory.glob("*.zip"))) == 1
+    report = json.loads((directory / "result.json").read_text())
+    assert report["suite"] == ("focused" if selection else "baseline")
+    assert report["selected_tests"] == selection
+
+
+def test_native_focused_selection_uses_only_requested_names(monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT / "tools"))
+    native = runpy.run_path(str(ROOT / "tests/blender/run_all.py"))
+    from unittest.mock import Mock
+
+    loader = Mock()
+    selection = ["test_provider_setup", "test_agent_artifacts.AgentArtifactTests"]
+    suite = native["load_suite"](loader, "baseline", selection)
+    loader.loadTestsFromNames.assert_called_once_with(selection)
+    loader.discover.assert_not_called()
+    assert suite is loader.loadTestsFromNames.return_value

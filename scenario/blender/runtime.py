@@ -7,6 +7,7 @@ import os
 import pathlib
 import threading
 import uuid
+from functools import partial
 
 import bpy
 
@@ -17,7 +18,7 @@ from ..core.api.sdk_adapter import Credentials as SDKCredentials
 from ..core.api.sdk_catalog import SDKCatalog
 from ..core.jobs.audio_decode import WaveformSpec
 from ..core.jobs.audio_player import PlayerSpec
-from ..core.jobs.credential_storage import open_credential_store
+from ..core.jobs.credential_storage import open_credential_store, open_provider_store
 from ..core.jobs.manager import JobManager
 from ..core.jobs.model_defaults import ModelDefaults
 from ..core.jobs.records import JobRegistry
@@ -26,6 +27,12 @@ from ..core.jobs.transfers import ResultDownloader, StoragePolicy
 from ..core.jobs.upload_sources import UploadSources
 from ..core.jobs.upload_store import UploadStore
 from ..core.jobs.upload_transfers import PartUploader, S3UploadPolicy
+from ..core.providers.config import ProviderProfile
+from ..core.providers.preferences import (
+    active_provider_preferences,
+    profile_from_preferences,
+    uses_external_assistant,
+)
 from ..mcp.upload_policy import ChosenFiles
 from .job_session import JobSession, OriginUnavailable, reap_retired
 
@@ -232,13 +239,22 @@ def paths():
     state_dir = pathlib.Path(bpy.utils.extension_path_user(PACKAGE, path="state", create=True))
     cache_dir = pathlib.Path(bpy.utils.extension_path_user(PACKAGE, path="cache", create=True))
     p = prefs()
-    raw_out = p.output_dir if p and p.output_dir else "~/Downloads/Scenario"
+    raw_out = p.output_dir if p and p.output_dir else "~/Downloads/Open Studio"
     output_dir = pathlib.Path(os.path.expanduser(bpy.path.abspath(raw_out)))
     return config.Paths(state_dir=state_dir, cache_dir=cache_dir, output_dir=output_dir)
 
 
 def credentials():
     p = prefs()
+    if uses_external_assistant(p):
+        return config.Credentials("", "")
+    try:
+        profile = selected_profile()
+        if profile is not None:
+            return profile
+        p = active_provider_preferences(p)
+    except ValueError:
+        return config.Credentials("", "")
     return config.resolve_credentials(
         p.api_key if p else "",
         p.api_secret if p else "",
@@ -246,9 +262,20 @@ def credentials():
     )
 
 
+def selected_profile():
+    """Snapshot external provider settings on Blender's main thread."""
+    return profile_from_preferences(prefs())
+
+
 def project_id():
     """Read the explicit optional override; never infer a key's server project."""
     p = prefs()
+    if uses_external_assistant(p):
+        return None
+    try:
+        p = active_provider_preferences(p)
+    except ValueError:
+        return None
     return (getattr(p, "project_id", "") or "").strip() or None
 
 
@@ -278,21 +305,34 @@ def ensure_catalog():
     sync_catalog_context()
     creds = credentials()
     if state.catalog is None:
-        if not creds.valid:
+        if uses_external_assistant(prefs()):
             raise ScenarioError(
-                0, "Complete the selected credential source in Scenario Preferences"
+                0,
+                "Use Codex ImageGen and import_agent_image, or choose an AI provider in Choose AI",
             )
+        if not creds.valid:
+            raise ScenarioError(0, "Complete the selected connection in Choose AI")
+        factory = None
         try:
-            selected = SDKCredentials(creds.key, creds.secret)
-            selected.authorization()
+            if isinstance(creds, ProviderProfile):
+                from ..core.providers.registry import make_adapter
+
+                selected = creds
+                factory = partial(make_adapter, state_dir=paths().state_dir)
+            else:
+                selected = SDKCredentials(creds.key, creds.secret)
+                selected.authorization()
         except ValueError:
             raise ScenarioError(
                 0, "The selected credentials are not a valid API key and secret"
             ) from None
         try:
-            store = open_credential_store(
-                paths().state_dir / "shared-jobs", selected, project_id=project_id()
+            opener = (
+                open_provider_store
+                if isinstance(selected, ProviderProfile)
+                else open_credential_store
             )
+            store = opener(paths().state_dir / "shared-jobs", selected, project_id=project_id())
         except StoreError as error:
             raise ScenarioError(0, str(error)) from None
         except ValueError:
@@ -300,7 +340,8 @@ def ensure_catalog():
                 0,
                 "Project ID must be an opaque ID, not a URL or whitespace; clear it for key scope",
             ) from None
-        state.catalog = SDKCatalog(selected, online=online(), scope=store.scope)
+        options = {"adapter_factory": factory} if factory is not None else {}
+        state.catalog = SDKCatalog(selected, online=online(), scope=store.scope, **options)
         state.job_store = store
         state.catalog_credentials = creds
         state.catalog_project_id = store.scope.project_id
@@ -356,6 +397,14 @@ def ensure_job_session():
             # Exact hosts documented by Scenario's CDN and asset-retrieval guides.
             # Never derive this allowlist from a service response or signed URL.
             policy = StoragePolicy(frozenset({"cdn.cloud.scenario.com", "cdn.scenario.com"}))
+            if isinstance(state.catalog_credentials, ProviderProfile):
+                from ..core.providers.transfers import ProviderResultDownloader
+
+                downloader = ProviderResultDownloader(
+                    adapter, online_access=catalog.network_allowed
+                )
+            else:
+                downloader = ResultDownloader(policy, online_access=catalog.network_allowed)
             root = paths().state_dir / "shared-results"
             root.mkdir(mode=0o700, parents=True, exist_ok=True)
             upload_root = paths().state_dir / "shared-uploads"
@@ -372,7 +421,7 @@ def ensure_job_session():
             session = JobSession(
                 adapter,
                 state.job_store,
-                result_downloader=ResultDownloader(policy, online_access=catalog.network_allowed),
+                result_downloader=downloader,
                 result_root=root,
                 upload_store=UploadStore(upload_root / "uploads.sqlite3", state.job_store.scope),
                 upload_sources=UploadSources(source_root),
@@ -669,7 +718,7 @@ def request_connection_check():
     manager = ensure_manager()
     key = object()
     state.connection_request = key
-    state.account_label = "Checking Scenario connection..."
+    state.account_label = "Checking AI connection..."
     state.connection_status = "pending"
     try:
         state.connection_worker = manager.check_connection(catalog, key)
@@ -678,7 +727,7 @@ def request_connection_check():
         state.connection_worker = None
         state.connection_status = ""
         state.account_label = ""
-        raise ScenarioError(0, "Could not start the Scenario connection check") from None
+        raise ScenarioError(0, "Could not start the AI connection check") from None
     return state.connection_worker
 
 

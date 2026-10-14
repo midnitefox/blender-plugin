@@ -201,9 +201,9 @@ class DesktopOpenTests(unittest.TestCase):
         # The preferences draw the portal link, then the update controls' links.
         type(preferences).draw(Preferences(preferences, layout), bpy.context)
         links = [
-            ("Create a key in the portal", prefs_module.PORTAL_KEYS_URL),
-            ("Update guide", updates.GUIDE_URL + "#updates"),
-            ("Release ZIPs", updates.RELEASES_URL),
+            ("Create a Scenario key", prefs_module.PORTAL_KEYS_URL),
+            ("Open Studio releases", updates.RELEASES_URL),
+            ("Setup guide", updates.GUIDE_URL),
         ]
         self.assertEqual(layout.opens(), links)
         self.assertEqual(layout.blender_openers(), [])

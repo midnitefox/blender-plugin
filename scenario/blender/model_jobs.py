@@ -545,7 +545,7 @@ class ModelJobs:
             or ticket.lane != lane
             or ticket.model_id != model_id
             or ticket.inputs != _snapshot(body)
-            or approved_cost != str(estimate.cost)
+            or approved_cost != estimate.approval_amount
         ):
             raise ScenarioError(0, "The request or approved cost changed; estimate again")
         # Consumption precedes persistence: an error may occur after a committed
@@ -569,7 +569,7 @@ class ModelJobs:
             or ticket.scene != scene
             or ticket.model_id != workflow_id
             or ticket.inputs != _snapshot(body)
-            or approved_cost != str(estimate.cost)
+            or approved_cost != estimate.approval_amount
             or not self._online()
         ):
             raise ScenarioError(0, "Approve the unchanged workflow and exact price while online")
@@ -591,7 +591,7 @@ class ModelJobs:
 
     def submit_film(self, quote, *, approved_cost):
         """Dispatch an owned Film approval through the ordinary saved-job lifecycle."""
-        if quote.film_task is None or approved_cost != str(quote.estimate.cost):
+        if quote.film_task is None or approved_cost != quote.estimate.approval_amount:
             raise ScenarioError(0, "Approve a Film task's unchanged exact price")
         return self._submit_quote(quote, lane="film", kind="film")
 
@@ -606,7 +606,7 @@ class ModelJobs:
             model_id=model_id,
             body=estimate.payload,
             status="prepared",
-            cu_cost=float(estimate.cost),
+            cu_cost=float(estimate.cost) if estimate.cost is not None else None,
             created_at=time.time(),
             meta=dict(meta or {}),
         )
@@ -2428,6 +2428,8 @@ class ModelJobs:
             if record.intent.quote_cost is not None
             else None,
             "cu_cost_exact": record.intent.quote_cost,
+            "provider_billed": record.intent.quote_cost is None
+            and getattr(record.intent, "source", "generation") == "generation",
             "source": getattr(record.intent, "source", "generation"),
             "kind": self.views[record.intent.request_id].kind
             if record.intent.request_id in self.views

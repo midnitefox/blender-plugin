@@ -201,7 +201,7 @@ def test_blank_permissions_capture_cannot_report_success(tmp_path, monkeypatch, 
     monkeypatch.setattr(
         sys,
         "argv",
-        ["blender", "--", str(tmp_path), "unused", "sidebar", "image", "8", "form", "blender"],
+        ["blender", "--", str(tmp_path), "scenario", "sidebar", "image", "8", "form", "blender"],
     )
     scene = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/capture_gui_scene.py"))
     assert not (tmp_path / "gui.json").exists()
@@ -218,11 +218,13 @@ def test_blank_permissions_capture_cannot_report_success(tmp_path, monkeypatch, 
 
 
 @pytest.mark.parametrize("failure", [None, "second_screenshot", "missing_file"])
-def test_preferences_complete_only_after_both_files(tmp_path, monkeypatch, failure):
+def test_preferences_complete_only_after_all_setup_files(tmp_path, monkeypatch, failure):
     timers = []
-    prefs = SimpleNamespace(credential_source="PREFERENCES")
+    prefs = SimpleNamespace(credential_source="PREFERENCES", provider_mode="AGENT")
     runtime = SimpleNamespace(
-        credentials=lambda: SimpleNamespace(valid=prefs.credential_source == "PREFERENCES")
+        credentials=lambda: SimpleNamespace(
+            valid=prefs.provider_mode == "SCENARIO" and prefs.credential_source == "PREFERENCES"
+        )
     )
     monkeypatch.setitem(sys.modules, "fixture.scenario.blender.runtime", runtime)
     bpy = Mock()
@@ -246,13 +248,16 @@ def test_preferences_complete_only_after_both_files(tmp_path, monkeypatch, failu
     monkeypatch.setattr(
         sys,
         "argv",
-        ["blender", "--", str(tmp_path), "unused", "sidebar", "image", "8", "form", "blender"],
+        ["blender", "--", str(tmp_path), "scenario", "sidebar", "image", "8", "form", "blender"],
     )
     scene = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/capture_gui_scene.py"))
     timers.clear()
     complete = Mock()
     scene["capture_credential_preferences"](Mock(), Mock(), complete)
     assert len(timers) == 1
+    complete.assert_not_called()
+    timers.pop(0)()
+    assert (tmp_path / "preferences-assistant.png").is_file()
     complete.assert_not_called()
     timers.pop(0)()
     assert (tmp_path / "preferences-preferences.png").is_file()

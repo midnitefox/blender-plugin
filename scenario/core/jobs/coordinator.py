@@ -322,8 +322,12 @@ class JobCoordinator:
         upload_sources=None,
         part_uploader=None,
     ):
-        if not isinstance(adapter, SDKAdapter) or not isinstance(store, JobStore):
-            raise TypeError("Use the shared SDK adapter and job store")
+        from ..providers.base import ProviderAdapter
+
+        if not isinstance(adapter, (SDKAdapter, ProviderAdapter)) or not isinstance(
+            store, JobStore
+        ):
+            raise TypeError("Use a supported provider adapter and scoped job store")
         if (
             isinstance(quote_ttl, bool)
             or not isinstance(quote_ttl, (int, float))
@@ -1416,7 +1420,7 @@ class JobCoordinator:
                 target_id=estimate.target_id,
                 payload_sha256=hashlib.sha256(estimate.payload_json).hexdigest(),
                 quote_sha256=hashlib.sha256(estimate.response_json).hexdigest(),
-                quote_cost=str(estimate.cost),
+                quote_cost=str(estimate.cost) if estimate.cost is not None else None,
                 mesh_sources=mesh_sources,
                 film_task=film_task,
             )

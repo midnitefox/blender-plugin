@@ -141,6 +141,7 @@ def inspect_zip(path):
                 name.is_absolute()
                 or ".." in name.parts
                 or "\\" in entry.filename
+                or "\\" in entry.orig_filename
                 or ":" in entry.filename
                 or entry.filename in files
                 or stat.S_ISLNK(entry.external_attr >> 16)

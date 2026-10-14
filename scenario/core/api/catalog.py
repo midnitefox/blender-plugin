@@ -7,7 +7,9 @@ Service reads and connection-local caches belong to SDKCatalog.
 
 from dataclasses import dataclass, field
 
-from ..scene.panorama_contract import PANORAMA_MODELS
+from ..scene.panorama_contract import PANORAMA_MODELS, contract_for
+
+PROVIDER_KINDS = frozenset({"comfyui", "openai_compatible", "fal"})
 
 GENERATION_LANES = (
     "image",
@@ -249,9 +251,14 @@ class ModelRecord:
     status: str = ""
     privacy: str = ""
     raw: dict = field(default_factory=dict)
+    # Set only by the selected catalog adapter. A service response cannot grant
+    # itself provider-specific lane handling by including a same-named field.
+    provider: str | None = None
 
     @classmethod
-    def from_api(cls, data):
+    def from_api(cls, data, *, provider=None):
+        if provider is not None and provider not in PROVIDER_KINDS:
+            raise ValueError("Choose an explicitly supported catalog provider")
         return cls(
             id=data.get("id", ""),
             name=data.get("name") or data.get("id", ""),
@@ -265,7 +272,41 @@ class ModelRecord:
             status=data.get("status") or "",
             privacy=data.get("privacy") or "",
             raw=dict(data),
+            provider=provider,
         )
+
+    @property
+    def provider_contract(self):
+        if self.provider not in PROVIDER_KINDS:
+            return {}
+        declaration = self.raw.get("openStudio")
+        return declaration if isinstance(declaration, dict) else {}
+
+    @property
+    def provider_lanes(self):
+        values = self.provider_contract.get("lanes", [])
+        if (
+            not isinstance(values, list)
+            or len(values) > len(GENERATION_LANES)
+            or any(not isinstance(value, str) or value not in GENERATION_LANES for value in values)
+        ):
+            return set()
+        lanes = set(values)
+        if "panorama" in lanes and contract_for(self.id, self) is None:
+            lanes.discard("panorama")
+        return lanes
+
+    @property
+    def provider_edit_tasks(self):
+        values = self.provider_contract.get("edit3dTasks", [])
+        allowed = {task[0] for task in EDIT3D_TASKS if task[0] != "ALL"}
+        if (
+            "3d23d" not in self.capabilities
+            or not isinstance(values, list)
+            or any(not isinstance(value, str) or value not in allowed for value in values)
+        ):
+            return set()
+        return set(values)
 
     @property
     def parameters(self):
@@ -294,6 +335,7 @@ class ModelRecord:
             lanes.add("material")
         if self.id in PANORAMA_MODELS:
             lanes.add("panorama")
+        lanes.update(self.provider_lanes)
         return lanes
 
 
@@ -397,15 +439,15 @@ def models_for_lane(lane, records):
         for r in records
         if lane in r.lanes
         and r.deprecated_successor is None
-        and r.status in ("", "trained")
+        and (r.status in ("", "trained") or (r.provider in PROVIDER_KINDS and r.status == "active"))
         and not is_trained(r)
     ]
     if lane == "material":
-        usable = [r for r in usable if r.id in PATINA_MODELS]
+        usable = [r for r in usable if r.id in PATINA_MODELS or "material" in r.provider_lanes]
     elif lane == "panorama":
-        usable = [r for r in usable if r.id in PANORAMA_MODELS]
+        usable = [r for r in usable if contract_for(r.id, r) is not None]
     elif lane == "render_image":
-        usable = [r for r in usable if r.id not in PATINA_MODELS and not is_utility(r)]
+        usable = [r for r in usable if "material" not in r.lanes and not is_utility(r)]
     return sorted(usable, key=lambda r: (rank.get(r.id, len(rank)), r.name.lower()))
 
 
@@ -420,7 +462,8 @@ def edit3d_models(task_id, records):
         return usable
     wanted = list(edit3d_task(task_id)[3])
     by_id = {r.id: r for r in usable}
-    return [by_id[m] for m in wanted if m in by_id]
+    curated = [by_id[m] for m in wanted if m in by_id]
+    return curated + [r for r in usable if r.id not in wanted and task_id in r.provider_edit_tasks]
 
 
 def tagged_video_model(model_id):

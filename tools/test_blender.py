@@ -58,7 +58,13 @@ def run(args):
     env = isolated_environment(profile, temporary)
     normal_profile = normal_profile_root()
     before = profile_snapshot(normal_profile)
-    report = {"status": "failed", "binary": str(binary), "suite": args.suite}
+    selected_tests = getattr(args, "test", [])
+    report = {
+        "status": "failed",
+        "binary": str(binary),
+        "suite": "focused" if selected_tests else args.suite,
+        "selected_tests": selected_tests,
+    }
     print(f"Artifacts: {directory}", flush=True)
     try:
 
@@ -171,6 +177,7 @@ def run(args):
                 args.suite,
                 "--report",
                 str(directory / "tests.json"),
+                *[part for name in selected_tests for part in ("--test", name)],
             ],
         )
         tests = json.loads((directory / "tests.json").read_text())
@@ -232,6 +239,13 @@ def main():
         help="Parent for unique run directories containing logs, ZIP and JSON reports",
     )
     parser.add_argument("--suite", choices=("baseline", "all"), default="baseline")
+    parser.add_argument(
+        "--test",
+        action="append",
+        default=[],
+        metavar="MODULE[.CLASS[.METHOD]]",
+        help="Run only these native tests (repeatable); reports this as a focused run",
+    )
     parser.add_argument(
         "--log", type=Path, help="Also stream phase output into a new UTF-8 log file"
     )

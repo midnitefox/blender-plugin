@@ -8,6 +8,20 @@ import pytest
 from scenario.core.ui.costs import format_cu
 
 
+def test_external_quote_is_unknown_and_requires_distinct_approval():
+    from scenario.core.api.sdk_adapter import Estimate
+    from scenario.core.ui.costs import format_approved_cost, quote_cost_fields
+
+    estimate = Estimate("model", "image", None, None, b"{}", b"{}", object(), 0)
+    fields = quote_cost_fields(estimate)
+    assert fields["cu_cost"] is None
+    assert fields["cu_cost_exact"] is None
+    assert fields["approved_cost"] == "provider-billed"
+    assert fields["provider_billed"] is True
+    assert "CU" not in fields["cost_label"]
+    assert "not quoted" in format_approved_cost(fields["approved_cost"])
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

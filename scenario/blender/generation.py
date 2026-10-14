@@ -627,7 +627,7 @@ def _apply_contract_settings(lane_state, schema, model_id, previous):
     would make origins captured in the scene stale; the caller re-arms the price
     for the returned names.
     """
-    contract = panorama_contract.contract_for(model_id)
+    contract = panorama_contract.contract_for(model_id, runtime.state.records.get(model_id))
     if contract is None:
         return set()
     values = list(contract.locked)
@@ -823,7 +823,9 @@ def _prepare_panorama(scene, lane_state, schema, request, references):
     """
     from . import panorama_lane
 
-    contract = panorama_contract.contract_for(request.model_id)
+    contract = panorama_contract.contract_for(
+        request.model_id, runtime.state.records.get(request.model_id)
+    )
     if contract is None:
         return ["Choose a verified panorama model for the Environment lane"]
     if contract.mode != scene.scenario.panorama_mode or lane_state.model_key not in (
@@ -1078,7 +1080,7 @@ def request_meta(context, lane, request=None):
         "model_name": record.name if record else lane_state.model_id,
     }
     if len(lane_state.trained):
-        # Job views name the LoRAs or composition with the base ("FLUX.1 Dev · LoRA (+1)").
+        # Job views name the LoRAs or composition with the base ("FLUX.1 Dev Â· LoRA (+1)").
         meta["model_name"] = trained_models.selection_label(lane_state, meta["model_name"])
         meta["trained_models"] = trained_models.selection_meta(lane_state)
     if lane == "material":
@@ -1175,7 +1177,7 @@ def process_model_jobs():
                 continue
             estimate = jobs.finish_quote(ticket)
             runtime.state.estimates[key] = ticket
-            lane_state.estimate_cu = float(estimate.cost)
+            lane_state.estimate_cu = float(estimate.cost) if estimate.cost is not None else -1.0
             lane_state.estimate_state = "READY"
             lane_state.estimate_error = ""
         except Exception as error:
@@ -1318,7 +1320,7 @@ def submit_generation(context, lane):
             scene,
             request.model_id,
             request.body,
-            approved_cost=str(estimate.cost),
+            approved_cost=estimate.approval_amount,
             lane=lane,
             meta=request_meta(context, lane, request),
         )

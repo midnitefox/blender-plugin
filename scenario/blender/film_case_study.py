@@ -501,7 +501,7 @@ class FilmCaseStudyCommands(FilmExportCommands):
                 "all": list(collected.scenes),
             },
             frame=source.scene.frame_start,
-            generator=f"Scenario for Blender {__version__}",
+            generator=f"Open Studio {__version__}",
         )
         markers = tuple(
             sorted(value for value in private if isinstance(value, str) and 12 <= len(value) <= 256)

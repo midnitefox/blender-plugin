@@ -56,24 +56,45 @@ SIDEBAR_CHARS = 36  # wrapped status text fits the default sidebar width
 
 
 def draw_account_strip(layout, context):
-    creds = runtime.credentials()
+    from .provider_setup import uses_external_assistant
+
     row = layout.row(align=True)
+    row.operator("scenario.choose_ai", text="Choose AI", icon="PREFERENCES")
+    if uses_external_assistant(runtime.prefs()):
+        row.label(text="Codex / external assistant", icon="USER")
+        for line in textwrap.wrap(
+            "Connect your assistant in Agents. Ask Codex to generate with ImageGen and import the result.",
+            SIDEBAR_CHARS,
+        ):
+            layout.label(text=line)
+        return False
+    try:
+        creds = runtime.credentials()
+        profile = runtime.selected_profile()
+    except (ValueError, RuntimeError):
+        row.label(text="Finish AI setup in Choose AI", icon="ERROR")
+        return False
     if not creds.valid:
-        source = getattr(runtime.prefs(), "credential_source", "PREFERENCES")
+        from .provider_setup import active_provider_preferences
+
+        source = getattr(
+            active_provider_preferences(runtime.prefs()), "credential_source", "PREFERENCES"
+        )
         message = (
             "Environment key/secret missing"
             if source == "ENVIRONMENT"
             else "Add key and secret in Preferences"
         )
         row.label(text=message, icon="ERROR")
-        row.operator("preferences.addon_show", text="", icon="PREFERENCES").module = runtime.PACKAGE
         return False
     if not runtime.online():
         row.label(text="Online access is disabled", icon="ERROR")
         return False
     label = runtime.state.account_label or (
-        "Connected" if runtime.state.catalog_loaded else "Connecting..."
+        "Models loaded" if runtime.state.catalog_loaded else "Test connection in Choose AI"
     )
+    if profile is not None and not runtime.state.account_label:
+        label = f"{profile.name}: {label}"
     icon = {"pending": "SORTTIME", "error": "ERROR", "success": "CHECKMARK"}.get(
         runtime.state.connection_status,
         "CHECKMARK" if runtime.state.catalog_loaded else "SORTTIME",
@@ -286,12 +307,18 @@ def draw_clip_options(layout, context, lane_state, schema):
 
 
 def generate_button_text(lane_state):
+    from .provider_setup import uses_external_assistant
+
+    if uses_external_assistant(runtime.prefs()):
+        return "Generate through your assistant"
     if not runtime.online():
         return "Offline"
     if not runtime.credentials().valid:
         return "Set up credentials"
     if lane_state.estimate_state == "READY" or generation.repeat_label(lane_state):
         # An unchanged form keeps its last price while it waits to offer Generate again.
+        if lane_state.estimate_cu < 0:
+            return "Generate  (cost not quoted)"
         prefix = "from " if lane_state.estimate_partial else ""
         return f"Generate  ({prefix}{format_cu(lane_state.estimate_cu)} CU)"
     if lane_state.estimate_state == "PENDING":
@@ -348,6 +375,10 @@ def model_chip_category(lane_state, lane):
 
 def model_button_text(lane_state):
     """The model chip label: the base, followed by the trained choice as "Base · LoRA (+n)"."""
+    from .provider_setup import uses_external_assistant
+
+    if uses_external_assistant(runtime.prefs()):
+        return "Codex / external assistant"
     record = runtime.state.records.get(lane_state.model_id)
     if record is not None:
         if len(lane_state.trained):
@@ -891,8 +922,8 @@ def draw_blockout_tab(layout, context):
 class SCENARIO_PT_main(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
-    bl_label = "Scenario"
+    bl_category = "Open Studio"
+    bl_label = "Open Studio"
     bl_order = 0
 
     def draw(self, context):
@@ -1004,7 +1035,7 @@ def draw_active_job(layout, rec):
 class SCENARIO_PT_jobs(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
+    bl_category = "Open Studio"
     bl_label = ""
     bl_order = 1
 
@@ -1030,7 +1061,7 @@ class SCENARIO_PT_jobs(bpy.types.Panel):
 class SCENARIO_PT_generations(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
+    bl_category = "Open Studio"
     bl_label = "Generations"
     bl_order = 2
 
@@ -1073,7 +1104,7 @@ class SCENARIO_PT_generations(bpy.types.Panel):
 class SCENARIO_PT_agents(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
+    bl_category = "Open Studio"
     bl_label = "Agents (MCP)"
     bl_order = 3
     bl_options = {"DEFAULT_CLOSED"}

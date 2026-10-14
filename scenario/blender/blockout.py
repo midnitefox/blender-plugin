@@ -257,7 +257,7 @@ class SCENARIO_OT_blockout_approve(bpy.types.Operator):
 
 
 def draw_status(layout, scene):
-    from ..core.ui.costs import format_cu
+    from ..core.ui.costs import format_approved_cost
 
     jobs = runtime.state.blockout_jobs
     item = jobs.current(scene) if jobs is not None else None
@@ -270,7 +270,7 @@ def draw_status(layout, scene):
         row.enabled = binding(scene) == item.binding
         op = row.operator(
             "scenario.blockout_approve",
-            text=f"Generate plan ({format_cu(item.cost)} CU)",
+            text=f"Generate plan ({format_approved_cost(item.cost)})",
             icon="PLAY",
         )
         op.quote_id, op.approved_cost = item.identifier, item.cost

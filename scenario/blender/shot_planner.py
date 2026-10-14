@@ -440,7 +440,7 @@ def _object_mode(context):
 
 
 def _confirm(
-    operator, context, event, message, title="Scenario camera path", confirm_text="Replace"
+    operator, context, event, message, title="Open Studio camera path", confirm_text="Replace"
 ):
     """Ask before erasing; in --background (no window) the operator simply runs."""
     if bpy.app.background or event is None or context.window is None:

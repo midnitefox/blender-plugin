@@ -19,7 +19,7 @@ class RegisterTests(unittest.TestCase):
         ).group(1)
         self.assertEqual(mod.__version__, manifest)
         prefs = bpy.context.preferences.addons[addon_name()].preferences
-        self.assertEqual(prefs.bl_rna.properties["output_dir"].default, "~/Downloads/Scenario")
+        self.assertEqual(prefs.bl_rna.properties["output_dir"].default, "~/Downloads/Open Studio")
         self.assertEqual(prefs.mcp_port, 9876)
         self.assertTrue(prefs.composer_enabled)
 
@@ -28,7 +28,7 @@ class RegisterTests(unittest.TestCase):
         paths = runtime.paths()
         self.assertTrue(str(paths.state_dir).endswith("state"))
         self.assertNotIn(
-            "extensions/user_default/scenario/", str(paths.state_dir).replace("\\", "/") + "/"
+            "extensions/user_default/open_studio/", str(paths.state_dir).replace("\\", "/") + "/"
         )
         self.assertTrue(paths.state_dir.exists())
 

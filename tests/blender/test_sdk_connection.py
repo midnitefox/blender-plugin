@@ -131,7 +131,7 @@ class SDKConnectionTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "Online Access"):
                 self.runtime.request_connection_check()
         self.prefs.api_secret = ""
-        with self.assertRaisesRegex(Exception, "selected credential source"):
+        with self.assertRaisesRegex(Exception, "selected connection"):
             self.runtime.request_connection_check()
         self.assertFalse(self.calls)
         self.assertIsNone(self.runtime.state.connection_request)

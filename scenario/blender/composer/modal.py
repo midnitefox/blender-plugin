@@ -360,7 +360,7 @@ def _ends_session_on_error(handle):
 
 class SCENARIO_OT_composer_modal(bpy.types.Operator):
     bl_idname = "scenario.composer_modal"
-    bl_label = "Scenario composer"
+    bl_label = "Open Studio composer"
     bl_options = {"INTERNAL"}
 
     @classmethod

@@ -413,7 +413,7 @@ class SCENARIO_PT_film_export(bpy.types.Panel):
     bl_parent_id = "SCENARIO_PT_film"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Scenario"
+    bl_category = "Open Studio"
 
     @classmethod
     def poll(cls, context):

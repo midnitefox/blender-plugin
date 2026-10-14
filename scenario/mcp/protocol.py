@@ -23,6 +23,10 @@ PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR, 
 )
 INSTRUCTIONS = (
     "Blender is open on the user's machine. Start with scene_summary, prefer the specific tools over execute_python, "
+    "For image creation, use your assistant's own image generation (such as Codex ImageGen) when available. "
+    "Call agent_workspace, save or copy the generated image into its inbox, then import_agent_image as "
+    "a REFERENCE, TEXTURE or IMAGE. That local handoff requires no Scenario account or ComfyUI. "
+    "Do not assume a generated image is a 3D mesh or a complete PBR material. "
     "quote the CU cost (estimate_cost) before generating, and place results where the user is working. "
     "Use list_assets or search_assets for scoped library metadata and reusable asset IDs; these do not download or apply assets. "
     "Use estimate_workflow then run_workflow for an explicitly approved workflow in this local scope. "

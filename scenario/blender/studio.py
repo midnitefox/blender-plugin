@@ -135,7 +135,7 @@ def draw_view(layout, context, *, width):
 def _draw_page(layout, context, width):
     view = context.window_manager.scenario_studio_view
     header = layout.row()
-    header.label(text="Scenario Studio", icon="SHADERFX")
+    header.label(text="Open Studio", icon="SHADERFX")
     header.label(text=context.scene.name, icon="SCENE_DATA")
     layout.label(text="Press Esc or click outside to return to the viewport")
     identifiers = tuple(item[0] for item in PAGES)
@@ -175,7 +175,7 @@ def _draw_page(layout, context, width):
 
 class SCENARIO_OT_open_studio(bpy.types.Operator):
     bl_idname = "scenario.open_studio"
-    bl_label = "Open Scenario Studio"
+    bl_label = "Open Studio workspace"
     bl_description = "Open expanded creation, Film, jobs and results using the current shared form and connection"
     bl_options = {"INTERNAL"}
 

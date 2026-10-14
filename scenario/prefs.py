@@ -2,12 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Add-on preferences: credentials, output folder, composer, MCP."""
 
-import textwrap
-
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import (
+    BoolProperty,
+    CollectionProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
+    StringProperty,
+)
 
-from .blender import updates
+from .blender import provider_setup, updates
 
 PORTAL_KEYS_URL = "https://app.scenario.com/team"
 
@@ -22,6 +27,25 @@ def credentials_changed(self, context):
 class ScenarioPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
+    provider_mode: EnumProperty(
+        name="AI setup",
+        items=(
+            (
+                "AGENT",
+                "Codex / external assistant",
+                "Use your assistant's own AI tools and import results",
+            ),
+            ("PROFILES", "AI provider", "Choose a saved local or hosted provider connection"),
+            ("COMFYUI", "Local ComfyUI", "Default local connection without a saved profile"),
+            ("SCENARIO", "Legacy Scenario account", "Use the original saved Scenario credentials"),
+        ),
+        default="AGENT",
+        update=provider_setup.provider_changed,
+    )
+    provider_profiles: CollectionProperty(type=provider_setup.SCENARIO_PG_ai_profile)
+    active_provider_index: IntProperty(
+        name="Selected AI profile", default=0, update=provider_setup.provider_changed
+    )
     credential_source: EnumProperty(
         name="Credentials",
         items=[
@@ -56,7 +80,7 @@ class ScenarioPreferences(bpy.types.AddonPreferences):
     output_dir: StringProperty(
         name="Output Folder",
         subtype="DIR_PATH",
-        default="~/Downloads/Scenario",
+        default="~/Downloads/Open Studio",
         description="Generated files are saved here, one subfolder per kind",
     )
     composer_enabled: BoolProperty(
@@ -98,38 +122,8 @@ class ScenarioPreferences(bpy.types.AddonPreferences):
     )
 
     def draw(self, context):
-        from .blender import runtime
-
         layout = self.layout
-        box = layout.box()
-        box.label(text="Account", icon="USER")
-        box.prop(self, "credential_source")
-        if self.credential_source == "PREFERENCES":
-            box.prop(self, "api_key")
-            box.prop(self, "api_secret")
-            box.label(text="Saved as plain text in userpref.blend", icon="INFO")
-            box.label(text="Select Environment to use SCENARIO_API_KEY + SCENARIO_API_SECRET")
-        else:
-            box.label(text="SCENARIO_API_KEY + SCENARIO_API_SECRET", icon="CONSOLE")
-            box.label(text="From the environment used to launch Blender")
-        box.prop(self, "project_id")
-        box.label(text="Blank uses the API key's default scope", icon="INFO")
-        if not runtime.credentials().valid:
-            box.label(text="The selected source needs both a key and a secret", icon="ERROR")
-        row = box.row(align=True)
-        row.operator(
-            "scenario.open_url", text="Create a key in the portal", icon="URL"
-        ).url = PORTAL_KEYS_URL
-        row.operator("scenario.test_connection", text="Test connection", icon="CHECKMARK")
-        if runtime.state.account_label:
-            # Labels clip instead of wrapping; permission guidance must stay readable.
-            icon = "ERROR" if runtime.state.connection_status == "error" else "INFO"
-            for index, line in enumerate(textwrap.wrap(runtime.state.account_label, 70)):
-                box.label(text=line, icon=icon if index == 0 else "NONE")
-        if not runtime.online():
-            box.label(
-                text="Allow Online Access is off in Blender's System preferences", icon="ERROR"
-            )
+        provider_setup.draw_provider_setup(layout, context, self)
         layout.prop(self, "output_dir")
         layout.prop(self, "composer_enabled")
         row = layout.row(align=True)
@@ -153,4 +147,4 @@ def get_prefs(context=None):
     return entry.preferences if entry else None
 
 
-CLASSES = (*updates.CLASSES, ScenarioPreferences)
+CLASSES = (*updates.CLASSES, provider_setup.SCENARIO_PG_ai_profile, ScenarioPreferences)

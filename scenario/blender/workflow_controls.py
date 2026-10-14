@@ -321,7 +321,7 @@ class WorkflowControls:
                     if signature(view.scene.scenario_workflow) != view.signature:
                         self.jobs.discard_workflow_quote(view.ticket.identifier)
                         raise ValueError("Inputs changed")
-                    view.cost = str(estimate.cost)
+                    view.cost = estimate.approval_amount
                     view.cost_warning = workflow_loop_warning(estimate.loop_steps) or ""
                 else:
                     outcomes = self.jobs.session.drain(task=task)
@@ -477,7 +477,11 @@ class SCENARIO_OT_generate_workflow(bpy.types.Operator):
             label = self._labels.get(name) or display_label(name)
             for line in textwrap.wrap(f"{label}: {_json(value)}", 70):
                 self.layout.label(text=line)
-        self.layout.label(text=f"Exact price: {self._cost} CU")
+        self.layout.label(
+            text="Provider billed; review provider pricing before approval"
+            if self._cost == "provider-billed"
+            else f"Exact price: {self._cost} CU"
+        )
         # Blender lays a popup out before sizing it; wrapped lines measure the requested width.
         with label_wrap.popup_layout(CONFIRMATION_WIDTH):
             _warn(self.layout, context, self._warning)
@@ -590,7 +594,11 @@ def draw(layout, context):
     text = "Generate (request price)"
     if ready:
         # A loop quote is a lower bound: show it as "from" the exact quoted price.
-        text = f"Generate ({'from ' if view.cost_warning else ''}{view.cost} CU)"
+        text = (
+            "Generate (provider billed)"
+            if view.cost == "provider-billed"
+            else f"Generate ({'from ' if view.cost_warning else ''}{view.cost} CU)"
+        )
     row.operator("scenario.generate_workflow", text=text, icon="PLAY")
     if ready and view.cost_warning:
         _warn(layout, context, view.cost_warning)
