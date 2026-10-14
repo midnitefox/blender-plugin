@@ -27,11 +27,13 @@ jobs:
     uses: ./.github/workflows/knowledge.yml
   agents:
     uses: ./.github/workflows/agent-skills.yml
+  site:
+    uses: ./.github/workflows/site-proxy.yml
 
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [lint, unit, sdk, blender, knowledge, agents]
+    needs: [lint, unit, sdk, blender, knowledge, agents, site]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -43,10 +45,12 @@ jobs:
           BLENDER_RESULT: ${{ needs.blender.result }}
           KNOWLEDGE_RESULT: ${{ needs.knowledge.result }}
           AGENTS_RESULT: ${{ needs.agents.result }}
+          SITE_RESULT: ${{ needs.site.result }}
         run: |
           set -euo pipefail
           for result in "$LINT_RESULT" "$UNIT_RESULT" "$SDK_RESULT" \
-              "$BLENDER_RESULT" "$KNOWLEDGE_RESULT" "$AGENTS_RESULT"; do
+              "$BLENDER_RESULT" "$KNOWLEDGE_RESULT" "$AGENTS_RESULT" \
+              "$SITE_RESULT"; do
             if [ "$result" != success ]; then
               echo "A required CI workload did not succeed: $result"
               exit 1

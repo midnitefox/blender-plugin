@@ -1,0 +1,5 @@
+# Upload only the proxy: without this, every other file here would be served
+# as a static file instead of the forwarded site.
+/*
+!middleware.ts
+!vercel.json

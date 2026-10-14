@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [{ "source": "/repo", "destination": "/repo/", "permanent": true }],
+  "rewrites": [{ "source": "/(.*)", "destination": "https://scenario-labs.github.io/blender-plugin/$1" }]
+}

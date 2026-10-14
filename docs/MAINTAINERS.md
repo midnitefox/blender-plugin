@@ -169,8 +169,11 @@ issue forms or `support@scenario.com`. The approved direction keeps Discussions
 off; revisit after external participation justifies a monitored Q&A channel.
 The wiki is already off and needs no further change under #20.
 
-Pages is configured with build type `workflow`, custom domain `blender.scenario.com`
-and enforced HTTPS. The handbook at `https://blender.scenario.com/` serves the
+Pages is configured with build type `workflow`, no custom domain and enforced
+HTTPS, so it serves the site at `https://scenario-labs.github.io/blender-plugin/`.
+A Vercel project serves `blender.scenario.com` in front of it, as described in
+[site hosting and download counts](#site-hosting-and-download-counts).
+The handbook at `https://blender.scenario.com/` serves the
 installation, update and support guidance; the repository homepage and
 [extension manifest](../scenario/blender_manifest.toml) Website link point there.
 The native repository at `/repo/index.json` has listed the published releases
@@ -203,6 +206,37 @@ gh api repos/scenario-labs/blender-plugin --jq '{has_issues,has_projects,has_wik
 gh api repos/scenario-labs/blender-plugin/pages
 gh api graphql -f query='{ repository(owner:"scenario-labs", name:"blender-plugin") { usesCustomOpenGraphImage openGraphImageUrl } }'
 ```
+
+### Site hosting and download counts
+
+`blender.scenario.com` is a Vercel project built from this repository with Root
+Directory `tools/site_proxy`, framework preset Other, no build or install
+command, production branch `main`, and deployments skipped when that directory
+is unchanged. [vercel.json](../tools/site_proxy/vercel.json) forwards every path
+to the Pages address above, and redirects `/repo` to `/repo/`, which Pages would
+otherwise redirect to its own host. [.vercelignore](../tools/site_proxy/.vercelignore)
+uploads only that file and the middleware, so no other file in the directory
+shadows a forwarded path. Production deployments stay public because Blender
+cannot authenticate. The DNS CNAME `blender` points to the target Vercel shows
+for the domain. Cutover and acceptance are tracked in #492.
+
+[The middleware](../tools/site_proxy/middleware.ts) runs on `/repo/*` and sends
+one anonymous PostHog event per counted request after the request continues:
+`extension_downloaded` for `GET /repo/scenario-X.Y.Z.zip` and
+`repository_checked` for `GET /repo/index.json`, with the properties listed in
+the [privacy page](PRIVACY.md#where-it-goes). HEAD requests, resumed downloads
+and other files are not counted. It reads the project token from
+`POSTHOG_PROJECT_TOKEN` and the optional ingestion host from `POSTHOG_HOST`
+(US cloud by default); without a token it counts nothing. A send that fails or
+takes over two seconds is logged and dropped without changing the response.
+
+A Blender download is an install or an update; the request does not say which.
+Index requests are repository additions and manual update checks, not active
+installations, because the extension sets up the repository without startup
+checks. Manual installs from release assets are not counted, and the release
+download counters include CI downloads. [CI](../.github/workflows/site-proxy.yml)
+type-checks the middleware and runs [its tests](../tools/site_proxy/middleware.test.ts);
+locally, run `node --test tools/site_proxy/middleware.test.ts` with Node 24.
 
 ## Access
 
@@ -348,6 +382,7 @@ to perform it.
 - [x] Add and read back the `ci-ok` required check with its verified GitHub Actions identity; preserve existing `pr-title`, `commits`, CodeQL, code-quality and review rules: #45. The hosted negative title check is verified; documentation review and merge remain.
 - [x] Verify the first automated release, then remove the repository-admin tag bypass while retaining release App integration `4751046`, both tag patterns and all protection rules; enable immutable releases only after publication and download verification: #36. Done on 2026-10-13 after 0.10.0 was published and its downloads verified, and read back: the tag ruleset keeps both patterns and its four rules with the release App as its only bypass actor, and immutable releases are enabled.
 - [x] Decide restricted allowed actions and require SHA pinning after workflow pins and update behavior are verified: #39. Decided and applied on 2026-10-13: full-SHA pinning is required and allowed actions stay `all`, read back through the API; a Pages run on `main` passed with the setting on.
+- [ ] Move `blender.scenario.com` behind the Vercel project and accept its download counts: #492.
 - [ ] Complete #56: the published handbook, homepage and manifest Website link are aligned; desktop Website-action acceptance remains. The native repository has served releases since 0.10.0.
 - [x] Upload the reviewed, merged social-preview card and verify its custom-image flag and URL: #19. Uploaded on 2026-10-13 and read back: the flag is `true`, the URL is on `repository-images.githubusercontent.com` and the image matches the committed card byte for byte.
 - [ ] Recheck the rendered shared-link preview of the repository in an application that unfurls links once its link cache refreshes. A Slack unfurl right after the 2026-10-13 upload still showed the previous card. #19 is closed with the GitHub-side evidence above.

@@ -12,12 +12,12 @@ use Blender's bundled Python and an isolated profile. Preserve exit codes when
 capturing logs, and distinguish passed checks from checks that were not run.
 
 [CI](../../.github/workflows/ci.yml) runs Python lint, unit tests, SDK contracts,
-the Linux/Windows Blender baseline, knowledge checks and agent-skill validation
-as reusable workflows on pull requests and pushes to `main`. The `ci-ok` job
-waits for all six workloads in that run and passes only when each succeeds;
-failed, cancelled, skipped or missing results fail the gate. PR updates cancel
-older CI runs for that PR. Concurrency belongs to the caller so reusable
-workflows cannot cancel their parent run.
+the Linux/Windows Blender baseline, knowledge checks, agent-skill validation and
+the site proxy tests as reusable workflows on pull requests and pushes to `main`.
+The `ci-ok` job waits for all seven workloads in that run and passes only when
+each succeeds; failed, cancelled, skipped or missing results fail the gate. PR
+updates cancel older CI runs for that PR. Concurrency belongs to the caller so
+reusable workflows cannot cancel their parent run.
 
 Individual job names can include their caller prefix; artifact names and native
 matrix coverage are unchanged. The separate `pr-title` and `commits` checks

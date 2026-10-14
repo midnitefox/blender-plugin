@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Scenario Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Site proxy
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  site-proxy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      # Node is not part of the checkout (no package.json): the compiler is
+      # installed ad hoc, as commitlint is, and Node runs the tests directly.
+      - name: Install TypeScript (CI only, the repo has no package.json)
+        run: npm install --prefix "$RUNNER_TEMP/tsc" --no-save --no-package-lock --no-audit --no-fund typescript@5 @types/node@24
+      - name: Type-check the middleware
+        run: >-
+          "$RUNNER_TEMP/tsc/node_modules/.bin/tsc" --noEmit --strict --target es2022
+          --module nodenext --moduleResolution nodenext --allowImportingTsExtensions
+          --typeRoots "$RUNNER_TEMP/tsc/node_modules/@types" --types node
+          tools/site_proxy/middleware.ts tools/site_proxy/middleware.test.ts
+      - name: Test the middleware
+        run: node --test tools/site_proxy/middleware.test.ts

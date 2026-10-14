@@ -169,10 +169,13 @@ stale docs build cannot roll the hosted repository back.
 
 [pages.yml](../.github/workflows/pages.yml) publishes the guide at
 `https://blender.scenario.com/` and the native repository at
-`https://blender.scenario.com/repo/index.json`. GitHub Pages hosts the site;
-the custom domain is configured in repository settings with DNS CNAME `blender`
-pointing to `scenario-labs.github.io`. Actions deployments do not need a committed
-CNAME file. Check DNS, certificate issuance and HTTPS enforcement before acceptance.
+`https://blender.scenario.com/repo/index.json`. GitHub Pages hosts the site at
+`https://scenario-labs.github.io/blender-plugin/` without a custom domain; a
+Vercel project serves `blender.scenario.com` by forwarding every request there
+and counts downloads, as described in
+[site hosting](MAINTAINERS.md#site-hosting-and-download-counts). Actions
+deployments do not need a committed CNAME file. Check DNS, certificate issuance
+and HTTPS before acceptance.
 
 The workflow runs on relevant `main` changes, successful release-workflow
 completion and manual dispatch. It always checks out current `main`. The
