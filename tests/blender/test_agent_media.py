@@ -152,6 +152,25 @@ class AgentMediaTests(unittest.TestCase):
             self.import_media(source, "VIDEO", **args)
         self.assertEqual(len(editor.strips), 2)
 
+    def test_retiming_refuses_zero_key_user_strips_before_target_mutation(self):
+        self.scene.render.fps = 30
+        editor = self.scene.sequence_editor_create()
+        existing = editor.strips.new_effect("User color", "COLOR", 1, 1, length=10)
+        existing.select = True
+        editor.active_strip = existing
+        before = self.timing()
+        source = self.source("film-four-seconds.mp4")
+        with patch.object(self.media.file_state, "mark_modified") as mark:
+            with self.assertRaisesRegex(ValueError, "matching-FPS"):
+                self.import_media(source, "VIDEO", channel=3)
+        mark.assert_not_called()
+        self.assertEqual(list(editor.strips), [existing])
+        self.assertFalse(getattr(existing, "retiming_keys", ()))
+        self.assertEqual(editor.active_strip, existing)
+        self.assertTrue(existing.select)
+        self.assertEqual((existing.frame_final_start, existing.frame_final_end), (1, 11))
+        self.assertEqual(self.timing(), before)
+
     def test_occupied_locked_and_muted_channels_refuse_without_shifting_content(self):
         editor = self.scene.sequence_editor_create()
         existing = editor.strips.new_effect("Existing", "COLOR", 3, 1, length=60)

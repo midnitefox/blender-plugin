@@ -15,6 +15,7 @@ _log_handler = None
 
 def _modules():
     from . import (
+        assistant_film_export,
         assistant_materials,
         assistant_mesh,
         assistant_ui,
@@ -31,6 +32,7 @@ def _modules():
         provider_setup,
         assistant_materials,
         assistant_mesh,
+        assistant_film_export,
         assistant_ui,
     )
 

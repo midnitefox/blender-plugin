@@ -12,8 +12,10 @@ asset handoff for images, PBR map sets, panoramic environments, models and
 audio/video. Full creative feature parity with the upstream extension is
 incomplete. The assistant creates assets with its available tools; the extension
 imports the supplied results. Structured blockout, mesh-edit round trips and
-animated reference captures are also available. Animation retargeting and full
-film orchestration remain unfinished.
+animated reference captures are also available. Film tools build editable shot
+scenes, assemble director timelines, arrange finished media for review, export
+MP4s and package portable editable projects.
+Animation retargeting remains unfinished.
 
 ## Install and connect
 

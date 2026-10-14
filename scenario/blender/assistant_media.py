@@ -78,6 +78,7 @@ def _insert(editor, path, *, kind, frame, channel, name, fps):
             raise ValueError("Blender could not decode the video")
         duration = max(1, round(strip.frame_duration * fps / strip.fps))
         if duration != strip.frame_duration:
+            _safe_retiming(editor, ignored=strip)
             # new_movie uses source frames. Retiming this new strip preserves
             # source seconds without changing the scene's FPS or other strips.
             strip.retiming_keys.add(timeline_frame=frame)
@@ -96,6 +97,20 @@ def _insert(editor, path, *, kind, frame, channel, name, fps):
         raise ValueError("Blender could not decode the media duration")
     strip.select = False
     return strip
+
+
+def _safe_retiming(editor, ignored=None):
+    # Blender 5.2's key-owner lookup can mistake a zero-key strip for the
+    # edited movie and crash. Never add keys to unrelated user strips to work
+    # around this. Review builders can stage all retimed movies first.
+    if editor is not None and any(
+        strip != ignored and not len(getattr(strip, "retiming_keys", ()))
+        for strip in editor.strips_all
+    ):
+        raise ValueError(
+            "Blender cannot safely retime video beside strips without retiming keys; "
+            "use matching-FPS media or build a new assistant review scene"
+        )
 
 
 def _description(strip):
@@ -254,6 +269,8 @@ def apply_media(snapshot, args):
         strips, reused = existing, True
     else:
         _free(editor, expected)
+        if any(item["type"] == "MOVIE" and item["retiming"] for item in expected):
+            _safe_retiming(editor)
         previous_editor = editor
         before = {strip.as_pointer() for strip in editor.strips} if editor else set()
         sounds = set(bpy.data.sounds)

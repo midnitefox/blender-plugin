@@ -41,6 +41,15 @@ ASSISTANT_TOOLS = {
     "build_agent_blockout",
     "clear_agent_blockout",
     "capture_agent_animation",
+    "inspect_agent_film",
+    "activate_agent_scene",
+    "build_agent_shot",
+    "build_agent_timeline",
+    "build_agent_review",
+    "export_agent_film",
+    "package_agent_project",
+    "get_agent_operation",
+    "cancel_agent_operation",
 }
 
 

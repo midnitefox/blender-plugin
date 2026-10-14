@@ -21,6 +21,10 @@ GROUPS = (
     ("Mesh editing", "scenario/mcp/tools_agent_mesh.py"),
     ("Scene blockout", "scenario/mcp/tools_agent_blockout.py"),
     ("Animation captures", "scenario/mcp/tools_agent_capture.py"),
+    ("Film inspection", "scenario/mcp/tools_agent_film.py"),
+    ("Film scenes and timelines", "scenario/mcp/tools_agent_film_scene.py"),
+    ("Film review", "scenario/mcp/tools_agent_film_review.py"),
+    ("Film export and portable projects", "scenario/mcp/tools_agent_film_export.py"),
     ("Scene tools (run on Blender's main thread)", "scenario/mcp/tools_blender.py"),
 )
 
@@ -75,6 +79,8 @@ def parse_specs(path):
             raise ValueError("SPECS must contain ToolSpec calls")
         name, description = (ast.literal_eval(arg) for arg in call.args[:2])
         schema = call.args[2]
+        if isinstance(schema, ast.Name):
+            schema = assignments.get(schema.id)
         if (
             not isinstance(schema, ast.Call)
             or not isinstance(schema.func, ast.Name)

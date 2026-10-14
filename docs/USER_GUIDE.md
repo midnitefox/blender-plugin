@@ -2,7 +2,7 @@
 
 Open Studio connects an assistant to your local Blender project. The current
 build supports image, material, environment, model and audio/video handoff,
-alongside local scene and camera tools. It is a development preview; full
+alongside local scene, camera and film tools. It is a development preview; full
 creative workflow parity with the upstream extension is still in progress.
 
 ## Install
@@ -193,6 +193,11 @@ frame rate. Video is retimed to retain its duration to the nearest scene frame.
 Embedded audio is included only when requested and requires a decodable stream
 and a separate free channel. Repeating an unchanged request reuses its strips.
 
+If existing strips make Blender's native retiming unsafe, rate-mismatched video
+is refused before insertion. The assistant can prepare video at the scene's
+frame rate or assemble it in a fresh `build_agent_review` scene, which safely
+orders the timing operations while preserving the requested layout.
+
 Audio and video remain external files. The tool returns the retained `asset_path`
 inside the extension's user storage. Keep that file for playback. To move the
 project, copy the retained media alongside the `.blend` and relink its sequencer
@@ -222,6 +227,64 @@ bring the finished clip back through `import_agent_media`.
 The mesh-edit workflow also accepts primitives made by `build_agent_blockout`.
 After a mesh edit, blockout refinement and clearing refuse to replace that
 changed content. Preserve the edited objects before starting a new blockout.
+
+## Build an editable film
+
+Ask the assistant to plan the shots, create the scene assets with its available
+tools, and build the film in Blender. For example: "Make two courtyard shots:
+a wide approach followed by a close view of the fountain. Keep the scene and
+camera movement editable, and assemble the shots for review."
+
+`build_agent_shot` creates a fresh scene from an explicit recipe: timing,
+resolution, colored primitives, optional self-contained GLB actors, camera
+positions and camera targets. Actors use files from the inbox with their exact
+SHA-256 hashes. Each shot owns its imported geometry and animation. Actor
+animation requires an explicit clip selection; the assistant must inspect the
+asset and choose a compatible clip. This does not retarget an unrelated rig.
+
+`build_agent_timeline` combines ordered shot scenes using their returned names
+and identities, with explicit inclusive source frame ranges. The result uses
+editable scene strips. These builders preserve the scene you were working in
+and create a new scene on every successful call. After an interrupted request,
+the assistant should inspect existing scenes before retrying.
+
+`inspect_agent_film` lists scenes or inspects one scene's actual camera, timing
+and strips. It can also return the original build recipe. Manual Blender edits
+remain authoritative; the saved recipe does not automatically track those edits.
+`activate_agent_scene` selects a shot for scene tools and camera capture without
+requiring Python execution.
+
+The assistant can capture shot references, process them with its available video
+tools, then use `build_agent_review` to arrange finished inbox images, video and
+audio in a new sequencer scene. The recipe specifies destination frame counts,
+free channels, source trims in seconds, volume and optional looping. Images hold
+for their declared duration. Video retains its source timing at the review's
+frame rate; audio must be explicitly requested. Each source requires its exact
+hash. Files are copied to retained local storage so inbox cleanup does not break
+the review. Save the project and keep its external media with it.
+
+`export_agent_film` renders a director timeline or media review to H.264 MP4
+using an isolated Blender process. It accepts an explicit frame range, even
+dimensions from 64 to 4096, integer frame rates from 1 to 120, and up to 15
+minutes. Audio can be explicitly enabled or disabled. The working scene and
+its render settings stay intact.
+
+`package_agent_project` creates a ZIP containing the selected editable scenes,
+their dependencies, copied media, recipes and an opening guide. It rewrites
+media paths to be relative and reopens the copied project to verify them.
+Extract the whole ZIP and open `Project.blend`, keeping `Media` beside it.
+Ordinary Blender can open this project without the extension. The portable
+format supports local scenes and standard images, fonts and audio/video; it
+refuses linked libraries, caches, volumes, tiled/sequence textures and modified
+or retimed sound strips. The tool reports unsupported content before delivery.
+
+Exports and packages return an operation ID. The assistant checks
+`get_agent_operation` until the state is `DONE`, then receives the verified
+local file path and hash. It can request `cancel_agent_operation` while work is
+pending. File load, Undo/Redo and disabling the extension cancel unpublished
+work. Stopping the connection alone lets an admitted local operation continue.
+Completed files remain in the local outbox; copy them to your project folder.
+Output names are never overwritten, so a revised export needs a new filename.
 
 ## Python permission
 

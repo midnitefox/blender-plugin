@@ -32,6 +32,10 @@ def test_committed_reference_matches_all_registered_source_contracts():
         "tools_agent_mesh.py",
         "tools_agent_blockout.py",
         "tools_agent_capture.py",
+        "tools_agent_film.py",
+        "tools_agent_film_scene.py",
+        "tools_agent_film_review.py",
+        "tools_agent_film_export.py",
         "tools_blender.py",
     }
     assert "generate" not in names and "estimate_cost" not in names
@@ -82,6 +86,17 @@ SPECS = (ToolSpec("example", "First line | summary.\\nArgs: rest", _schema(
 def test_malformed_markers_fail_instead_of_rewriting_unrelated_text(document):
     with pytest.raises(ValueError):
         generator.replace_block(document, "replacement\n")
+
+
+def test_named_schema_is_resolved_without_importing_the_tool_module(tmp_path):
+    path = tmp_path / "tool.py"
+    path.write_text("""raise RuntimeError("Never import this module")
+_OPERATION = _schema({"operation_id": {"type": "string"}}, ["operation_id"])
+SPECS = [ToolSpec("status", "Read status.", _OPERATION, handler)]
+""")
+    tool = generator.parse_specs(path)[0]
+    assert tool["properties"] == {"operation_id": {"type": "string"}}
+    assert tool["required"] == ["operation_id"]
 
 
 def test_initialize_guidance_uses_assistant_image_handoff():

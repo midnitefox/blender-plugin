@@ -38,7 +38,7 @@ creates assets with its own tools and hands local files to Blender through a
 bounded local inbox. The active extension offers scene inspection and editing,
 camera paths, captures, image references, PBR map application, panoramic Worlds,
 model/package and point-cloud import, audio/video strips, structured blockout,
-mesh-edit round trips and animated reference capture.
+mesh-edit round trips, animated reference capture and editable film scenes.
 Python execution is a separate explicit opt-in.
 
 The active registration has no direct generation provider, service credential

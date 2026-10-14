@@ -24,8 +24,19 @@ is Blender 5.0; dependency and runtime acceptance have separate gates.
   provides a blocking queue pump for background Blender.
 - [tools_agent.py](../../scenario/mcp/tools_agent.py) exposes the bounded inbox
   and image handoff. Dedicated modules handle PBR maps, panoramic Worlds,
-  models, point clouds, media, mesh edits, blockouts and animated captures.
+  models, point clouds, media, mesh edits, blockouts, animated captures and film
+  scenes. Film builders use local recipes, persistent scene identities and
+  explicit inbox assets; they do not use retained service job/session wrappers.
   [The current MCP reference](../MCP.md) is generated from that registry.
+- [assistant_film_export.py](../../scenario/blender/assistant_film_export.py)
+  owns local export/package operations. Main-thread preparation snapshots current
+  scene contents; offline workers render or copy/rewrite/reopen portable projects.
+  A registered timer or operation poll finalizes completed work. File load,
+  Undo/Redo and disable invalidate unpublished operations. Background hashing
+  binds the result digest to a prepared-file identity/size/time stamp; the main
+  thread rechecks that stamp and publishes without overwriting. Private staging
+  and these checks detect ordinary changes and replacements; they are not an
+  isolation boundary against a hostile process running as the same OS user.
 - [agent_artifacts.py](../../scenario/core/agent_artifacts.py) verifies bounded
   local file snapshots. Image and supported model resources are packed;
   audio/video remains in retained external files. Operations preserve unrelated

@@ -77,13 +77,14 @@ For other assets, use the same inbox with these explicit handoffs:
 `restore_agent_material` and `restore_agent_environment` restore previous
 assignments only while the applied result remains unchanged in the current
 session. File load, Undo/Redo and extension disable clear the restore handles.
-The tools preserve unrelated objects, slots and timeline strips. All file
-handoffs accept optional SHA-256 verification and reject paths outside the inbox.
+The tools preserve unrelated objects, slots and timeline strips. Single-asset
+imports accept optional SHA-256 verification; film asset bindings require it.
+File handoffs reject paths outside the inbox.
 
 The plugin cannot invoke the assistant's generation tools or access their
 accounts. A generated image supplies pixels; model creation, accurate PBR maps,
 rigging and other outputs require suitable assistant capabilities. Animation
-retargeting and full film orchestration remain unfinished. The local
+retargeting remains unfinished. The local
 mesh-edit round trip, structured blockout and animated-reference capture are
 available through dedicated tools below.
 
@@ -113,6 +114,38 @@ owned content against edits, sharing and outside references before removal.
 directory. It requires the GUI, validates actual decoded timing and dimensions,
 and restores capture settings on success or failure. The assistant must copy
 the clip for long-term storage and use its own video tools for generation.
+
+## Editable film scenes
+
+`build_agent_shot` accepts a complete local recipe and explicit inbox GLB actors.
+It creates independent editable geometry, animation and camera movement.
+`build_agent_timeline` assembles exact scene names and IDs with inclusive source
+frame ranges into editable scene strips. `build_agent_review` arranges finished
+inbox pictures, video and audio using explicit timing, trims, channels and loops.
+These builders create fresh scenes and preserve the previously active scene.
+They require no generation-service state. Inspect after an interrupted request
+before retrying a non-idempotent build.
+
+`inspect_agent_film` reports current editable contents and, optionally, original
+build inputs. A persistent scene ID establishes identity, not a content revision.
+`activate_agent_scene` selects a named local scene for subsequent scene tools or
+capture. Scene identities must be unique when supplied. Film asset bindings use
+required SHA-256 hashes and the same bounded inbox as other handoffs.
+
+`export_agent_film` snapshots a director timeline or review and renders an MP4
+in an isolated offline Blender process. `package_agent_project` copies selected
+editable scenes and dependencies into a portable ZIP, rewrites external media
+to relative paths and reopens it for verification. Both return a session
+operation ID. Poll `get_agent_operation` to `DONE` before consuming its result;
+`ERROR` and `CANCELLED` are terminal failures. `cancel_agent_operation` requests
+cancellation without removing an already completed file.
+
+The operation owner cancels unpublished work on load, Undo, Redo and extension
+disable. Scene IDs bind identity; the snapshot captures current edits. A stopped
+MCP listener does not cancel an admitted operation. Published outputs are kept
+in the assistant outbox with verified path, size and SHA-256, and never overwrite
+an existing file. Export and packaging have separate schema limits and refuse
+unsupported media or dependencies.
 
 ## Security model
 
@@ -181,7 +214,7 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
-| `import_agent_media` | Import assistant-created WAV/MP3/OGG audio or MP4/WebM video from the agent_workspace inbox into the current scene's sequencer. Choose explicit free channels and start frame; occupied ranges are refused and existing strips, selection and scene FPS are preserved. Video playback is retimed to preserve its duration at the scene FPS. include_audio also requires a decodable audio stream and a different audio_channel. Identical unchanged requests reuse their strips after checking actual media and timing. The extension keeps a verified persistent media copy; strips cannot pack it, so moving the project requires copying that media and relinking its paths. This does not generate audio or video. | `filename`*: string; Media basename in the inbox<br>`kind`*: string (['AUDIO', 'VIDEO'])<br>`start_frame`: integer<br>`channel`: integer<br>`name`: string<br>`include_audio`: boolean<br>`audio_channel`: integer<br>`sha256`: string; Optional SHA-256 of exact media | - |
+| `import_agent_media` | Import assistant-created WAV/MP3/OGG audio or MP4/WebM video from the agent_workspace inbox into the current scene's sequencer. Choose explicit free channels and start frame; occupied ranges are refused and existing strips, selection and scene FPS are preserved. Video playback is retimed to preserve its duration at the scene FPS. If existing strips make native retiming unsafe, use matching-FPS media or build_agent_review in a fresh scene. include_audio also requires a decodable audio stream and a different audio_channel. Identical unchanged requests reuse their strips after checking actual media and timing. The extension keeps a verified persistent media copy; strips cannot pack it, so moving the project requires copying that media and relinking its paths. This does not generate audio or video. | `filename`*: string; Media basename in the inbox<br>`kind`*: string (['AUDIO', 'VIDEO'])<br>`start_frame`: integer<br>`channel`: integer<br>`name`: string<br>`include_audio`: boolean<br>`audio_channel`: integer<br>`sha256`: string; Optional SHA-256 of exact media | - |
 
 ### Assistant models
 
@@ -216,6 +249,35 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
 | `capture_agent_animation` | Capture a silent local MP4 reference from the scene camera or 3D viewport for your assistant's own video tool. Requires Blender's GUI and an open 3D viewport. Choose a camera_name for CAMERA, or use the active/first scene camera. Supply both start_frame and end_frame, or use the current preview/scene range. Captures are limited to 20 seconds, 600 frames and 1920x1080; width and height must be even. grey_clay requests solid single-color shading. The original camera, frame, range, rendering and viewport settings are restored. Returns a unique retained outbox path, SHA-256 and clip timing. Copy the MP4 to your project for long-term storage. This does not generate video. | `source`: string (['CAMERA', 'VIEWPORT'])<br>`camera_name`: string; Camera in the current scene<br>`start_frame`: integer<br>`end_frame`: integer<br>`width`: integer<br>`height`: integer<br>`grey_clay`: boolean | read-only annotation; GUI required |
+
+### Film inspection
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `inspect_agent_film` | List local Blender scenes and film identities, or inspect one named scene's actual timing, camera, sequencer strips and optional saved build recipe. Scene IDs establish identity, not content revisions. Manual Blender edits are authoritative; the stored recipe records original build inputs. Inspection does not open external media or verify that its files still exist. Lists are bounded and report truncation. Pass scene_id with scene_name to detect a replaced or duplicated identity. | `scene_name`: string<br>`scene_id`: string<br>`include_recipe`: boolean | read-only annotation |
+| `activate_agent_scene` | Switch the current Blender window to an explicitly named local scene in Object Mode. Use the scene_id returned by a film builder or inspect_agent_film to guard scene identity. This lets scene tools and animation capture operate on a new shot while Python execution stays disabled. Preserves the geometry, timeline and selection stored in each scene. Reports whether the active scene changed. | `scene_name`*: string<br>`scene_id`: string | - |
+
+### Film scenes and timelines
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `build_agent_shot` | Build a new independent editable shot scene from a complete assistant-authored recipe. Specify integer FPS, even resolution and 1 to 7200 frames within 120 seconds. Categorized primitives use blockout center positions/full XYZ sizes, linear RGB colors and optional grouped labels. Camera/target paths and full actor/primitive transform keys use strictly increasing integer frames starting at 1 with linear interpolation. Primitive motion scale multiplies its size; actor transforms use its GLB origin, Blender Z-up units and XYZ degrees, without automatic fitting. Every GLB actor requires an inbox filename and SHA256; geometry and rigs import independently and images are packed. Animated actors require an explicit zero-based animation_index from the source GLB, with once/loop/hold mode; phase selects a held pose. Builds a new scene, preserves current scene/selection/frame, and rolls back failed construction. Returns its persistent scene_id identity, timing and native undo availability; save the blend to retain it. | `plan`*: object | - |
+| `build_agent_timeline` | Build a new editable director timeline from ordered explicit shot scene_name/scene_id references and inclusive source start_frame/end_frame ranges. Uses consecutive scene strips on channel 1 from timeline frame 1, with cut markers. All sources must be local shot scenes with matching integer FPS/resolution and a valid camera; duplicate scene identities and out-of-range trims are refused before mutation. scene_id is identity, not a content fingerprint: the timeline references each shot's current editable content. Supports up to 128 cuts within ten minutes and 72000 frames. Does not replace existing scenes or change current scene/selection/frame. Returns identity, timing and undo availability. | `plan`*: object | - |
+
+### Film review
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `build_agent_review` | Create a NEW editable sequencer scene from verified assistant inbox media, preserving the active scene, selection and unrelated strips. Each call creates a distinct review scene. Pictures accept IMAGE (PNG/JPEG/WebP) or VIDEO (MP4/WebM); audio accepts WAV/MP3/OGG. Every item requires an inbox basename, exact sha256, start_frame, frame_count and channel. Source trim is seconds aligned to a destination frame boundary. Video preserves source seconds across FPS changes. loop repeats the source remaining after trim; false refuses insufficient source duration. IMAGE holds its frame_count and cannot trim or loop. include_audio requires a decodable video audio stream and explicit separate audio_channel. volume controls audio gain. Overlapping ranges on the same channel are refused. Limits: 600-second timeline, 128 items, 2048 resulting strips, 512 MiB total media, 64 MiB per image. Retained verified copies survive inbox cleanup; copy and relink those files when moving the blend project. Returns scene_name, scene_id, kind, timing, strips and retained_media. This tool does not generate media or export a finished film. | `name`*: string<br>`fps`: integer<br>`width`: integer<br>`height`: integer<br>`pictures`: array<br>`audio`: array | - |
+
+### Film export and portable projects
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `export_agent_film` | Snapshot the current contents of one explicitly named director timeline or media review and render H.264 MP4 locally in an isolated Blender worker. Supports bounded SCENE strips and their selected camera or sequencer input. Optional scene_id guards identity, not revisions. Writes a new basename.mp4 in the assistant outbox; never overwrites. Use integer scene FPS 1-120, even dimensions 64-4096 and at most 15 minutes. Supply both frame bounds or neither. Audio defaults to audible timeline audio. Returns a session operation_id; poll get_agent_operation for progress and the verified output path/digest. File load, Undo, Redo or extension disable cancel unpublished operations. Does not change the working scene or its render settings. | `scene_name`*: string<br>`scene_id`: string<br>`filename`*: string<br>`start_frame`: integer<br>`end_frame`: integer<br>`width`: integer<br>`height`: integer<br>`audio`: boolean | - |
+| `package_agent_project` | Snapshot explicit local scenes and their dependencies into a portable editable project ZIP in the assistant outbox. Each scene entry uses scene_name and optional scene_id. The new basename.zip contains Project.blend, copied relative Media, local recipes, a manifest and opening instructions. Verifies the rewritten blend by reopening it in an isolated Blender process and reads back the entire ZIP. Preserves packed images. Refuses linked/overridden data, movie clips, caches, volumes, tiled/sequence textures, and packed, retimed or modified sound strips. Limits: 256 scenes, 2000 external media files, 16 GiB media, 4 GiB blend. Returns operation_id for get_agent_operation; never overwrites and cancels unpublished work on load/Undo/Redo/disable. Stored recipes are build inputs; the blend contains current edits. No generation service is required to open the extracted project. | `scenes`*: array<br>`filename`*: string | - |
+| `get_agent_operation` | Read a local film export or project package operation from this Blender session. Returns phase, progress, sources, result and error. DONE includes the verified local output path, SHA-256 and size. Reading may finalize a completed worker's prepared file in the outbox. Operation IDs do not survive restarting Blender. | `operation_id`*: string | - |
+| `cancel_agent_operation` | Request cancellation of a pending local film export or project package. The worker stops and its private staging is removed; unpublished output cannot appear later. A completed published file remains available. Poll get_agent_operation until CANCELLED, ERROR or DONE. | `operation_id`*: string | - |
 
 ### Scene tools (run on Blender's main thread)
 

@@ -15,7 +15,7 @@ send those tool results to its own service as part of your conversation.
 
 Connect only clients you authorize to work on that project. Dedicated tools can
 also change selection, the frame, the scene camera, materials, World, imported
-models, blockout geometry and timeline media. Explicit mesh-edit tools can
+models, blockout geometry, film scenes and timeline media. Explicit mesh-edit tools can
 replace geometry, UVs, materials or rigging on a captured target. Stopping
 the local server prevents further MCP requests.
 
@@ -45,7 +45,20 @@ Undo/Redo, extension disable or superseding export. A connected assistant can
 read the returned path to use the file with its own tools. Animation references
 are silent MP4 files retained under `assistant-outbox`; copy them into the
 project for long-term storage before removing extension data. Blockout recipes
-and revision information persist in the saved `.blend` file.
+and revision information persist in the saved `.blend` file. Film scene identities
+and original build recipes also persist there. Film inspection can return these
+recipes and the declared local media paths to the connected assistant. Review
+media is copied into retained local storage and must travel with the project.
+
+Film exports render local snapshots in isolated offline Blender processes.
+Portable project packages copy the selected scenes and their dependencies,
+including external media, into a ZIP. The resulting video or ZIP remains in
+the assistant outbox until removed and can be read by the connected assistant.
+Packages contain scene recipes, asset names and editable scene data. Review
+their contents before sharing. Temporary render and packaging snapshots are
+cleaned up on completion or cancellation. Stopping the MCP listener prevents
+new requests but lets admitted local operations continue; file load, Undo/Redo
+and extension disable cancel pending work before publication.
 
 ## The local MCP server
 
