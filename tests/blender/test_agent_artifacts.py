@@ -56,6 +56,16 @@ class AgentArtifactTests(unittest.TestCase):
         node = next(n for n in target.active_material.node_tree.nodes if n.type == "TEX_IMAGE")
         self.assertTrue(node.image.packed_file)
 
+    def test_image_handoff_preserves_existing_noncolor_map_interpretation(self):
+        first = self.tools.import_agent_image({"filename": self.source.name, "mode": "IMAGE"})
+        data_map = bpy.data.images[first["image"]]
+        data_map.colorspace_settings.name = "Non-Color"
+        second = self.tools.import_agent_image({"filename": self.source.name, "mode": "IMAGE"})
+        color_image = bpy.data.images[second["image"]]
+        self.assertNotEqual(data_map, color_image)
+        self.assertEqual(data_map.colorspace_settings.name, "Non-Color")
+        self.assertEqual(color_image.colorspace_settings.name, "sRGB")
+
     def test_reference_and_texture_survive_save_reopen_without_inbox_source(self):
         bpy.ops.mesh.primitive_cube_add()
         target = bpy.context.active_object

@@ -1,9 +1,9 @@
 # Open Studio for Blender: user guide
 
 Open Studio connects an assistant to your local Blender project. The current
-build supports assistant-generated image import and local scene and camera
-tools. It is a development preview; the broader creative workflows from the
-upstream extension are not yet available here.
+build supports image, material, environment, model and audio/video handoff,
+alongside local scene and camera tools. It is a development preview; full
+creative workflow parity with the upstream extension is still in progress.
 
 ## Install
 
@@ -69,8 +69,82 @@ the same image and destination reuses the imported content.
 
 Texture mode creates a new base-color material for the chosen object. Materials
 used by other objects are preserved. It supplies one texture input; roughness,
-normal, displacement and other PBR maps are not generated or assembled by this
-handoff.
+normal and other PBR maps use the dedicated material handoff below.
+
+## Apply a material map set
+
+Ask the assistant to create or prepare matching maps, copy them into the inbox,
+and call `import_agent_material` for the exact mesh. The mesh needs UVs and must
+be editable in Object Mode. Supply `base_color` and whichever of `roughness`,
+`metallic`, `normal`, `height` and `ambient_occlusion` are available:
+
+```json
+{"object_name":"Crate","maps":{"base_color":{"filename":"wood.png"},"roughness":{"filename":"wood-roughness.png"},"normal":{"filename":"wood-normal.png"}}}
+```
+
+Maps must be PNG, JPEG or WebP with matching dimensions, up to 64 MiB each,
+256 MiB combined and 32 megapixels combined. Base color uses sRGB; data maps
+use Non-Color. Normal maps must use OpenGL tangent space. Height adds bump;
+it does not change geometry. AO multiplies base color. The tool creates a new
+material in the chosen mesh's active slot and preserves other slots and objects.
+It packs each map into the saved project. Creating accurate, aligned PBR maps
+depends on the assistant's tools and requires visual review.
+
+`restore_agent_material` restores the previous assignment for the named mesh
+while the imported result remains unchanged. Restoration is available only in
+the current session, until file load, Undo/Redo or extension disable. It refuses
+to discard changes made after application.
+
+## Apply a panoramic environment
+
+Have the assistant prepare a 2:1 equirectangular PNG, JPEG, EXR or Radiance HDR,
+copy it into the inbox, then call:
+
+```json
+{"filename":"studio.exr","strength":1.0}
+```
+
+Use that object as the arguments to `import_agent_environment`. The limit is
+128 MiB and 32 megapixels. The image is packed and assigned to a new World.
+A 2:1 image must actually depict an equirectangular panorama; its dimensions
+alone do not establish projection, a seamless horizon or high dynamic range.
+`restore_agent_environment` returns to the previous World while the applied
+result is unchanged, with the same session limits as material restoration.
+
+## Import a model
+
+The assistant can copy a self-contained GLB 2.0 into the inbox and call
+`import_agent_model` with its filename. Files may be up to 256 MiB; external
+file and URL references are refused. The model retains hierarchy, materials,
+packed textures, rigs, skin weights, shape keys and animation clips supported
+by Blender's importer. Rigged import requires a Blender window context.
+
+Use `name` to label its new collection and `location` for a world-space
+bottom-center position. The default position is the 3D cursor. Existing
+selection, current frame, timeline range and frame rate are preserved. Save the
+project to retain the model. Each call creates a new group; after an interrupted
+call, inspect the scene before retrying. Creating, remeshing or rigging a model
+requires suitable assistant tools; this handoff imports their finished result.
+
+## Add audio or video to the timeline
+
+The assistant copies WAV, MP3, OGG, MP4 or WebM into the inbox and calls
+`import_agent_media`. Choose `AUDIO` or `VIDEO`, a start frame and a free channel:
+
+```json
+{"filename":"shot.mp4","kind":"VIDEO","start_frame":1,"channel":1,"include_audio":true,"audio_channel":2}
+```
+
+The maximum is 512 MiB per file. The tool validates the media before adding
+strips, refuses occupied channel ranges and preserves existing strips and scene
+frame rate. Video is retimed to retain its duration to the nearest scene frame.
+Embedded audio is included only when requested and requires a decodable stream
+and a separate free channel. Repeating an unchanged request reuses its strips.
+
+Audio and video remain external files. The tool returns the retained `asset_path`
+inside the extension's user storage. Keep that file for playback. To move the
+project, copy the retained media alongside the `.blend` and relink its sequencer
+paths. Deleting the original inbox file does not remove the retained copy.
 
 ## Local scene and camera tools
 
@@ -131,7 +205,7 @@ out of reports.
 ## Privacy
 
 A connected assistant can receive requested scene data and viewport captures.
-It may process those results using its own service. Local image import makes no
+It may process those results using its own service. Local asset import makes no
 external request; the assistant's generation step follows its own account and
 service settings. Keep the local token and private connection file out of shared
 reports. Imported pixels remain in a saved `.blend` file after inbox cleanup.

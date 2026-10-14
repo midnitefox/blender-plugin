@@ -25,6 +25,9 @@ def test_committed_reference_matches_all_registered_source_contracts():
     assert len(names) == len(set(names))
     assert {Path(path).name for _, path in generator.GROUPS} == {
         "tools_agent.py",
+        "tools_agent_materials.py",
+        "tools_agent_media.py",
+        "tools_agent_models.py",
         "tools_blender.py",
     }
     assert "generate" not in names and "estimate_cost" not in names

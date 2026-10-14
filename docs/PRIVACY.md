@@ -1,8 +1,8 @@
 # Open Studio privacy and data handling
 
 Open Studio connects your assistant to Blender on this computer. The extension
-exposes local scene tools and an inbox for images produced by the assistant.
-This page covers the extension; image generation and assistant processing follow
+exposes local scene tools and an inbox for assets produced by the assistant.
+This page covers the extension; generation and assistant processing follow
 the policies and account settings of the assistant you choose.
 
 ## What a connected assistant can receive
@@ -14,21 +14,29 @@ camera captures can reveal anything visible in the project. The assistant may
 send those tool results to its own service as part of your conversation.
 
 Connect only clients you authorize to work on that project. Dedicated tools can
-also change selection, the frame, the scene camera and imported images. Stopping
+also change selection, the frame, the scene camera, materials, World, imported
+models and timeline media. Stopping
 the local server prevents further MCP requests.
 
-## Image handoff and local storage
+## Asset handoff and local storage
 
-The assistant creates or edits an image using its own tool, then saves or copies
-it into the extension's local inbox. `import_agent_image` reads that bounded
-local file and packs the decoded image into Blender. It makes no external
+The assistant creates or edits assets using its own tools, then saves or copies
+them into the extension's local inbox. Import tools read bounded local files,
+verify their contents and apply them in Blender. They make no external
 request. The assistant's generation step is governed by that assistant's service.
 
 The inbox persists in the extension's user state directory until its files are
 removed. Imported packed pixels persist in the saved `.blend` file; deleting the
 inbox copy does not remove pixels already packed into a saved project. The tool
-can return image names, object names and a content hash to the assistant.
-Temporary capture and image-decoding files are cleaned up after use.
+can return asset names, object names, local paths and content hashes to the
+assistant. Temporary capture and asset-decoding files are cleaned up after use.
+
+Material maps, World images and model textures are also packed into the saved
+project. Audio/video files are copied into persistent `assistant-media` storage
+under the extension's user directory and referenced by sequencer strips. They
+are not packed into `.blend` files. Keep them for playback and copy/relink them
+when moving a project. Removing an inbox source or timeline strip does not
+automatically delete this retained media copy.
 
 ## The local MCP server
 
@@ -48,7 +56,7 @@ the connected assistant arbitrary Python execution with Blender's local user
 permissions. The limited blocked call spellings are not a security sandbox.
 Code can access files or the network according to those permissions.
 
-The dedicated image and scene tools work without enabling arbitrary Python.
+The dedicated asset and scene tools work without enabling arbitrary Python.
 `blender_api_help` only inspects the running Blender Python API.
 
 ## Release and help links

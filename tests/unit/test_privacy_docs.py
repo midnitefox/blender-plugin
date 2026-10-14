@@ -17,10 +17,15 @@ ACTIVE_SOURCES = (
     "scenario/blender/runtime.py",
     "scenario/blender/assistant_loop.py",
     "scenario/blender/assistant_ui.py",
+    "scenario/blender/assistant_materials.py",
+    "scenario/blender/assistant_media.py",
     "scenario/blender/provider_setup.py",
     "scenario/blender/mcp_service.py",
     "scenario/blender/updates.py",
     "scenario/mcp/tools_agent.py",
+    "scenario/mcp/tools_agent_materials.py",
+    "scenario/mcp/tools_agent_media.py",
+    "scenario/mcp/tools_agent_models.py",
     "scenario/mcp/tools_blender.py",
     "scenario/mcp/server.py",
     "scenario/mcp/stdio_shim.py",
@@ -49,12 +54,14 @@ def test_privacy_entry_points_and_critical_local_storage_disclosures():
         "scene summaries",
         "current file path",
         "Viewport and",
-        "makes no external",
+        "make no external",
         "agent-connection.json",
         "bearer token",
         "127.0.0.1",
         "inbox persists",
         "saved `.blend` file",
+        "assistant-media",
+        "not packed into `.blend` files",
         "Allow connected assistants to run Python",
         "off by default",
         "not a security sandbox",
@@ -99,6 +106,6 @@ def test_standalone_guide_preserves_assistant_disclosures(tmp_path):
     assert "Privacy" in text
     assert "PRIVACY.md" in text
     assert "requested scene data and viewport captures" in text
-    assert "Local image import makes no" in text
+    assert "Local asset import makes no" in text
     assert "private connection file" in text
     assert "removed with the extension" not in text

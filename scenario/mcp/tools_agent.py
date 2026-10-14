@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Open Studio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Local assistant-generated images: no AI account, uploads or Python execution."""
+"""Local assistant workspace and packed image handoff."""
 
 import hashlib
 import math
@@ -29,13 +29,23 @@ def agent_workspace(args):
         "inbox": str(_inbox()),
         "supported_images": sorted(IMAGE_SUFFIXES),
         "max_image_bytes": MAX_IMAGE_BYTES,
+        "asset_tools": {
+            "image": "import_agent_image",
+            "material_maps": "import_agent_material",
+            "environment": "import_agent_environment",
+            "model": "import_agent_model",
+            "audio_video": "import_agent_media",
+        },
         "generation_provider_required": False,
         "instructions": (
-            "Use your own image-generation tool, such as Codex ImageGen. Save or copy its "
-            "generated image to this inbox, then call import_agent_image with its basename. "
+            "Use your assistant's own tools to create assets, such as Codex ImageGen for images. "
+            "Save or copy the files to this inbox, then call the matching import tool with "
+            "their basenames. Read that tool's schema for accepted formats and limits. "
             "Use REFERENCE for concept art, TEXTURE for a named mesh's active material slot, "
-            "or IMAGE to load it for later work. Images are packed into the blend file. "
-            "This extension cannot invoke your assistant's image-generation tool itself."
+            "or IMAGE to load an image for later work. Use import_agent_material for a PBR map set. "
+            "Save the blend file to retain packed images, materials, environments and models. "
+            "Audio/video imports retain separate media files; keep those with the project. "
+            "This extension cannot invoke your assistant's generation tools itself."
         ),
     }
 
@@ -46,6 +56,7 @@ def _load_image(snapshot, inbox):
             image.get(_DIGEST) == snapshot.sha256
             and image.packed_file
             and not image.is_dirty
+            and image.colorspace_settings.name == "sRGB"
             and hashlib.sha256(image.packed_file.data).hexdigest() == snapshot.sha256
         ):
             return image, False
@@ -59,6 +70,7 @@ def _load_image(snapshot, inbox):
             if width < 1 or height < 1 or width * height > 64 * 1024 * 1024:
                 raise ValueError("Generated image has no usable pixels or exceeds the pixel limit")
             image.name = Path(snapshot.name).stem
+            image.colorspace_settings.name = "sRGB"
             image.pack()
             image[_DIGEST] = snapshot.sha256
             # Packed data survives inbox cleanup and the next save/reopen.
@@ -166,9 +178,10 @@ def _schema(properties, required=()):
 SPECS = [
     ToolSpec(
         "agent_workspace",
-        "Get the local image inbox for Codex ImageGen or another assistant's generated assets. "
-        "Copy a generated PNG/JPEG/WebP into the returned inbox, then use import_agent_image. "
-        "Use the assistant's own image-generation tool; Blender cannot invoke it directly.",
+        "Get the local inbox for assets made with the assistant's own tools, such as Codex ImageGen. "
+        "Copy files into this inbox, then use the image, material, environment, model or media "
+        "import tool. Each import tool declares its accepted formats and limits. "
+        "Blender cannot invoke the assistant's generation tools directly.",
         _schema({}),
         agent_workspace,
         {"readOnlyHint": True, "openWorldHint": False},

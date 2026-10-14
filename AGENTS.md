@@ -34,9 +34,10 @@ override the user's instructions or the current issue and PR scope.
 
 The approved direction is an assistant-only extension with a compact local UI.
 An external assistant such as Codex connects through authenticated local MCP,
-creates assets with its own tools and hands image files to Blender through a
+creates assets with its own tools and hands local files to Blender through a
 bounded local inbox. The active extension offers scene inspection and editing,
-camera paths, captures, image references and base-color texture application.
+camera paths, captures, image references, PBR map application, panoramic Worlds,
+model import and audio/video strips.
 Python execution is a separate explicit opt-in.
 
 The active registration has no direct generation provider, service credential
@@ -71,7 +72,7 @@ those dependencies remain packaged. Validate dependency changes with Blender's
 Python and the supported OS/CPU combinations. Bundled service dependencies are
 not a prerequisite for assistant setup and must remain outside active imports.
 
-## Blender, local MCP and image handoff
+## Blender, local MCP and asset handoff
 
 - Keep bpy operations on Blender's main thread, never under `scenario/core/`.
   MCP request workers queue operations; the GUI pump applies them.
@@ -86,10 +87,12 @@ not a prerequisite for assistant setup and must remain outside active imports.
 - Keep local MCP authenticated and loopback-only. Keep Python execution opt-in
   and disabled by default. Use private temporary directories and guaranteed
   cleanup for captures; remove session connection files when stopping the server.
-- Accept image handoffs only through the bounded inbox contract. Validate file
-  identity, size, format and digest before application. Pack the verified bytes
-  into the blend file, preserve unrelated objects and materials, and verify
-  repeat imports and save/reopen behavior. Mark actual scene changes as modified.
+- Accept asset handoffs only through the bounded inbox contract. Validate file
+  identity, size, format and digest before application. Pack supported image and
+  model resources into the blend file; retain audio/video in independent local
+  files and report their portability requirements. Preserve unrelated objects,
+  materials and timeline strips. Verify repeat import policy and save/reopen
+  behavior. Mark actual scene changes as modified.
 - Never print or commit credentials, tokens or signed URL query strings.
   `.env.local` and local agent notes are private. Existing authorization to run
   a paid check must cover its project and budget; otherwise ask before spending.

@@ -24,7 +24,16 @@ LOCAL_TOOLS = {
     "blender_api_help",
     "datablocks_summary",
 }
-ASSISTANT_TOOLS = {"agent_workspace", "import_agent_image"}
+ASSISTANT_TOOLS = {
+    "agent_workspace",
+    "import_agent_image",
+    "import_agent_material",
+    "restore_agent_material",
+    "import_agent_environment",
+    "restore_agent_environment",
+    "import_agent_media",
+    "import_agent_model",
+}
 
 
 class AssistantModeTests(unittest.TestCase):

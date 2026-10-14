@@ -3,9 +3,10 @@
 ## Overview
 
 The `open-studio` server gives a connected assistant access to the open Blender
-scene and a local inbox for image handoff. Generation takes place through the
-assistant's own tools. The current registered tools cover that image handoff and
-local Blender inspection, selection, timeline, camera and capture operations.
+scene and a local inbox for asset handoff. Generation takes place through the
+assistant's own tools. The registered tools cover images, PBR maps, panoramic
+Worlds, models, audio/video and local Blender inspection, selection, timeline,
+camera and capture operations.
 
 Start with `scene_summary`. Before applying a texture, inspect the exact target
 with `object_detail` and verify its UV coordinates. Use dedicated scene tools
@@ -53,10 +54,36 @@ file in the local inbox, validates it and decodes it in Blender. Paths outside
 the inbox are refused. An optional `sha256` binds the import to exact content.
 Identical imported content can be reused without creating duplicate assets.
 
-A generated image supplies pixels. Automated mesh generation, complete PBR map
-sets, rigging, motion, audio, video and panoramic World application are not
-exposed by this build. The plugin cannot invoke the assistant's generation tool
-or access its account on the assistant's behalf.
+For other assets, use the same inbox with these explicit handoffs:
+
+- `import_agent_material`: named UV mesh and a map of explicit roles to files.
+  Base color is required; roughness, metallic, OpenGL normal, bump height and
+  ambient occlusion are optional. PNG/JPEG/WebP maps need matching dimensions.
+  Limits are 64 MiB each, 256 MiB combined and 32 megapixels combined.
+- `import_agent_environment`: 2:1 equirectangular PNG/JPEG/EXR/Radiance HDR,
+  up to 128 MiB and 32 megapixels. Packs the image into a new World. Projection,
+  seamlessness and actual HDR content still require review.
+- `import_agent_model`: self-contained GLB 2.0 up to 256 MiB, with embedded
+  materials/textures and supported rig, morph and animation data. Creates a new
+  group at the requested location or cursor. Each call imports another group;
+  inspect the scene after an interrupted call before retrying.
+- `import_agent_media`: WAV/MP3/OGG or MP4/WebM up to 512 MiB, with an explicit
+  start frame and free channels. Video keeps its source duration at the scene
+  FPS, rounded to a whole scene frame. Optional embedded audio requires a
+  separate channel and decodable stream.
+  The result includes a retained external media path that must travel with the
+  project; these strips cannot pack their source into the `.blend` file.
+
+`restore_agent_material` and `restore_agent_environment` restore previous
+assignments only while the applied result remains unchanged in the current
+session. File load, Undo/Redo and extension disable clear the restore handles.
+The tools preserve unrelated objects, slots and timeline strips. All file
+handoffs accept optional SHA-256 verification and reject paths outside the inbox.
+
+The plugin cannot invoke the assistant's generation tools or access their
+accounts. A generated image supplies pixels; model creation, accurate PBR maps,
+rigging and other outputs require suitable assistant capabilities. Mesh editing,
+animation retargeting, blockout and full film orchestration remain unfinished.
 
 ## Security model
 
@@ -66,7 +93,7 @@ or access its account on the assistant's behalf.
   scene using the registered tools. Only connect assistants you authorize to
   work on the current project. Stop the server to end access.
 - Blender's online-access permission controls starting the local listener.
-  The image import itself makes no external request.
+  The local asset imports themselves make no external requests.
 - `execute_python` is disabled by default and requires **Allow connected assistants
   to run Python** to be explicitly enabled. Its code runs on Blender's main
   thread with the user's permissions. Blocking some dangerous call spellings
@@ -81,8 +108,9 @@ See [Privacy](PRIVACY.md) for local persistence and assistant data handling.
 ## GUI and background operation
 
 `screenshot_viewport` and `render_still` need a visible Blender 3D viewport.
-They are unavailable in a background process. Other tools operate on the scene
-in the Blender process receiving the request.
+They are unavailable in a background process. Rigged GLB imports also require
+a Blender window context. Other tools operate on the scene in the Blender
+process receiving the request.
 
 An isolated profile with the extension enabled can run:
 
@@ -108,8 +136,29 @@ Do not edit this block by hand; run `make mcp-docs`. An asterisk marks a require
 
 | Tool | Description | Arguments | Notes |
 | --- | --- | --- | --- |
-| `agent_workspace` | Get the local image inbox for Codex ImageGen or another assistant's generated assets. Copy a generated PNG/JPEG/WebP into the returned inbox, then use import_agent_image. Use the assistant's own image-generation tool; Blender cannot invoke it directly. | none | read-only annotation |
+| `agent_workspace` | Get the local inbox for assets made with the assistant's own tools, such as Codex ImageGen. Copy files into this inbox, then use the image, material, environment, model or media import tool. Each import tool declares its accepted formats and limits. Blender cannot invoke the assistant's generation tools directly. | none | read-only annotation |
 | `import_agent_image` | Import an assistant-generated image from the agent_workspace inbox. IMAGE loads packed pixels; REFERENCE creates a viewport reference at the 3D cursor; TEXTURE applies a new base-color material to the named mesh's active slot, requiring UVs. This does not generate a full PBR material. Existing other-object materials are preserved. Packed pixels survive inbox cleanup. Repeating the same image and destination reuses it. This local import works with arbitrary Python execution disabled. | `filename`*: string; Image basename inside the assistant inbox<br>`mode`: string (['IMAGE', 'REFERENCE', 'TEXTURE'])<br>`object_name`: string; Required for TEXTURE<br>`sha256`: string; Optional digest to verify the exact generated image<br>`display_size`: number | - |
+
+### Assistant materials and environments
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `import_agent_material` | Apply an assistant-created PBR map set from the local inbox to one named editable mesh with UVs. Supply base_color and explicit optional roughness, metallic, normal, height and ambient_occlusion roles, each with filename and optional sha256. Maps must be PNG/JPEG/WebP with matching dimensions. Creates a new packed material in the active slot while preserving other objects and slots. Base color is sRGB; other maps are Non-Color. Normal uses OpenGL tangent space; height uses bump; AO multiplies base color. Repeating an unchanged set in this session reuses it. Does not create maps or establish their physical accuracy. | `object_name`*: string<br>`maps`*: object; Explicit role to {filename, sha256?}; base_color is required<br>`normal_convention`: string (['OPENGL'])<br>`height_distance`: number | - |
+| `restore_agent_material` | Restore the named mesh's material slot from the most recent assistant PBR application in this live file session. Refuses changed graphs, maps, destinations or copied geometry. A mesh copy created to isolate a shared mesh stays isolated. Restores only while the original data still exists; unavailable after load, undo, redo or extension disable. | `object_name`*: string | - |
+| `import_agent_environment` | Apply an assistant-supplied equirectangular PNG/JPEG/EXR/Radiance HDR from the local inbox to the current scene. Requires actual 2:1 dimensions, at least 4x2, at most 32 megapixels and 128 MiB. Packs the image and creates a separate Environment Texture World. The previous World stays untouched and can be restored in this live file session. Repeat unchanged input and strength reuses it. Dimensions do not establish correct panorama projection, seams or high dynamic range. | `filename`*: string<br>`sha256`: string<br>`strength`: number | - |
+| `restore_agent_environment` | Restore the previous World after the most recent assistant environment application in this live file session. Refuses an edited or replaced World or image. Unavailable after load, undo, redo or extension disable. | none | - |
+
+### Assistant audio and video
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `import_agent_media` | Import assistant-created WAV/MP3/OGG audio or MP4/WebM video from the agent_workspace inbox into the current scene's sequencer. Choose explicit free channels and start frame; occupied ranges are refused and existing strips, selection and scene FPS are preserved. Video playback is retimed to preserve its duration at the scene FPS. include_audio also requires a decodable audio stream and a different audio_channel. Identical unchanged requests reuse their strips after checking actual media and timing. The extension keeps a verified persistent media copy; strips cannot pack it, so moving the project requires copying that media and relinking its paths. This does not generate audio or video. | `filename`*: string; Media basename in the inbox<br>`kind`*: string (['AUDIO', 'VIDEO'])<br>`start_frame`: integer<br>`channel`: integer<br>`name`: string<br>`include_audio`: boolean<br>`audio_channel`: integer<br>`sha256`: string; Optional SHA-256 of exact media | - |
+
+### Assistant models
+
+| Tool | Description | Arguments | Notes |
+| --- | --- | --- | --- |
+| `import_agent_model` | Import a self-contained GLB 2.0 created by the connected assistant's modeling tools. Copy it to agent_workspace's inbox and pass its basename. Maximum 256 MiB; external file or URL references are refused. Meshes, hierarchy, materials, packed textures, rigs, skin weights, shape keys and animation clips are retained. A new group is placed with its frame-zero bottom center at the explicit location, or the current 3D cursor. Existing selection, current frame, timeline range and scene frame rate stay unchanged. Rigged imports require a Blender window context. This imports an existing generated model; it does not generate or rig one. Every call creates another group; inspect the scene after an interrupted call before retrying. Arbitrary Python execution may stay off. | `filename`*: string; GLB basename in the inbox<br>`sha256`: string; Optional SHA-256 of the GLB<br>`location`: array; World-space bottom-center location; defaults to the 3D cursor<br>`name`: string | - |
 
 ### Scene tools (run on Blender's main thread)
 

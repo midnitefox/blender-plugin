@@ -8,9 +8,9 @@ Use the current assistant-only guides for installation and everyday work:
 - [Privacy and data handling](PRIVACY.md)
 - [Support](../SUPPORT.md)
 
-The active workflow is assistant-generated image handoff and local Blender
-control. Direct generation-service setup and the upstream model workflow are not
-part of this build. The [changelog](../CHANGELOG.md) retains upstream release
+The active workflow is assistant-created asset handoff and local Blender
+control. Generation takes place in the assistant's own tools. The
+[changelog](../CHANGELOG.md) retains upstream release
 history and does not establish this fork's current feature coverage.
 
 ## Historical upstream implementation reference

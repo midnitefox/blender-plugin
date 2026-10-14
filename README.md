@@ -1,16 +1,18 @@
 # Open Studio for Blender
 
 Connect an assistant to Blender to inspect your scene, create camera moves, and
-bring assistant-generated images into your project. Open Studio is an
+bring assistant-created assets into your project. Open Studio is an
 assistant-only development fork of
 [Scenario for Blender](https://github.com/scenario-labs/blender-plugin), maintained
 in [midnitefox/blender-plugin](https://github.com/midnitefox/blender-plugin).
 It retains the upstream GPL license and copyright notices.
 
 **Development preview:** the current workflow supports local scene tools and
-image handoff. Full creative feature parity with the upstream extension is
-incomplete. Automated 3D generation, rigging, motion, complete PBR materials,
-video, panorama and audio workflows are not exposed in this build.
+asset handoff for images, PBR map sets, panoramic environments, models and
+audio/video. Full creative feature parity with the upstream extension is
+incomplete. The assistant creates assets with its available tools; the extension
+imports the supplied results. Mesh editing, animation retargeting, blockout and
+film orchestration still need dedicated assistant workflows.
 
 ## Install and connect
 
@@ -47,8 +49,25 @@ files are PNG, JPEG and WebP, up to 64 MiB per image.
 | `IMAGE` | A packed image datablock for later work. |
 
 Save the `.blend` file to retain the packed image. A base-color image supplies
-one material input; full PBR maps and mesh generation need additional workflows
-that are not implemented in this build.
+one material input. For a complete map set, use the material handoff below.
+
+## Work with other assets
+
+Use the same local inbox and ask the assistant to choose the matching tool:
+
+| Asset | Local handoff |
+| --- | --- |
+| PBR material | `import_agent_material` applies supplied base color and optional roughness, metallic, normal, height and AO maps to one named UV mesh. |
+| Environment | `import_agent_environment` applies a supplied 2:1 equirectangular PNG, JPEG, EXR or Radiance HDR to the World. |
+| Model | `import_agent_model` imports a self-contained GLB, retaining supported materials, textures, rigs and animation data. |
+| Audio or video | `import_agent_media` adds WAV, MP3, OGG, MP4 or WebM to explicitly chosen sequencer channels and frames. |
+
+Material images, environments and model textures are packed into the saved
+project. Audio/video uses retained external files; keep those files with the
+project when sharing or moving it. Material and environment tools also provide
+guarded restoration during the current session. See the [user guide](docs/USER_GUIDE.md)
+for limits and examples. The assistant needs a suitable generation tool for
+each requested asset; image generation alone does not provide all asset types.
 
 ## Local Blender control
 
@@ -70,12 +89,12 @@ GUI. See [MCP setup and security](docs/MCP.md) for connection details and limits
 
 ## Privacy and help
 
-Image import reads from the extension's local inbox and packs the pixels into
-Blender. A connected assistant can receive the scene data and captures requested
-through MCP. Image generation performed by the assistant follows its own
+Asset import reads from the extension's local inbox. A connected assistant can
+receive the scene data and captures requested through MCP. Generation performed
+by the assistant follows its own
 service policies. Keep the local token and connection file private.
 
-- [User guide](docs/USER_GUIDE.md): installation, image handoff and troubleshooting.
+- [User guide](docs/USER_GUIDE.md): installation, asset handoff and troubleshooting.
 - [MCP reference](docs/MCP.md): local tool contracts and client setup.
 - [Privacy](docs/PRIVACY.md): data handling and Python permissions.
 - [Support](SUPPORT.md): fork issues and useful diagnostic information.

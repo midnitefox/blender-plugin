@@ -28,12 +28,16 @@ INSTRUCTIONS = (
     "Call agent_workspace, save or copy the generated image into its inbox, then import_agent_image "
     "with its basename as a REFERENCE, TEXTURE or IMAGE. TEXTURE requires a named editable mesh "
     "with UV coordinates and applies a new base-color material to its active slot. Save the blend "
-    "file to retain packed images. A generated image supplies pixels; automated mesh generation, "
-    "full PBR maps, rigging, motion, audio and video workflows are not exposed by this build. "
+    "file to retain packed assets. Use import_agent_material for an explicit PBR map set, "
+    "import_agent_environment for an equirectangular World, import_agent_model for a model, "
+    "and import_agent_media for audio/video strips. Read each schema before preparing files. "
+    "Audio/video retains external media files that must travel with the project. "
+    "Generate assets with the connected assistant's available tools, then import the results. "
+    "Image pixels alone do not establish mesh geometry, correct PBR maps or a genuine HDR panorama. "
     "Viewport and OpenGL captures require Blender's GUI. Use blender_api_help before scripting. "
     "execute_python is disabled unless the user has explicitly enabled the Python preference; "
     "it runs with Blender's user permissions and is not a security sandbox. "
-    "This extension cannot invoke the assistant's own generation tool itself."
+    "This extension cannot invoke the assistant's own generation tools itself."
 )
 
 

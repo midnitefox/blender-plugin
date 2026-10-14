@@ -14,9 +14,16 @@ _log_handler = None
 
 
 def _modules():
-    from . import assistant_ui, desktop, file_state, provider_setup, shot_planner
+    from . import (
+        assistant_materials,
+        assistant_ui,
+        desktop,
+        file_state,
+        provider_setup,
+        shot_planner,
+    )
 
-    return (file_state, desktop, shot_planner, provider_setup, assistant_ui)
+    return (file_state, desktop, shot_planner, provider_setup, assistant_materials, assistant_ui)
 
 
 def apply_log_level(level):
