@@ -192,10 +192,6 @@ class UploadCommands:
     def _suggest(self, record, planned, sending):
         if record.state != UploadState.UPLOADING:
             return _RECOVERY[record.state]
-        from ..providers.base import ProviderAdapter
-
-        if isinstance(self._adapter, ProviderAdapter):
-            return UploadRecoveryAction.POLL_REMOTE
         request_id = record.intent.request_id
         if record.active_part is not None:
             if request_id in sending:
@@ -291,10 +287,6 @@ class UploadCommands:
             self._sources.verify(current.intent)
         except Exception:
             raise UploadError("Staged upload is unavailable or changed") from None
-        from ..providers.base import ProviderAdapter
-
-        if isinstance(self._adapter, ProviderAdapter):
-            return self._initialize_provider(current)
         with self._guard(current.intent.origin):
             current = self._transition(current, UploadState.INITIALIZING)
         try:
@@ -326,44 +318,6 @@ class UploadCommands:
                     "Scenario returned no usable part destinations; restart the upload"
                 ) from None
         return current
-
-    def _initialize_provider(self, current):
-        """Hand an exact staged snapshot to the selected provider once."""
-        intent = current.intent
-        if intent.kind not in self._adapter.upload_kinds:
-            raise UploadError("The selected provider cannot accept this reference type")
-        maximum = self._adapter.max_reference_bytes
-        if intent.file_size > maximum:
-            raise UploadError(f"Provider references must be at most {maximum // (1024 * 1024)} MiB")
-        if not self._adapter.network_allowed():
-            raise UploadError("Online access is disabled")
-        data = b"".join(
-            self._sources.part(intent, number) for number in range(1, len(intent.part_sha256) + 1)
-        )
-        try:
-            self._adapter.validate_upload(data, media_type=intent.content_type, kind=intent.kind)
-        except ValueError as exc:
-            raise UploadError(str(exc)) from None
-        with self._guard(intent.origin):
-            current = self._transition(current, UploadState.INITIALIZING)
-        try:
-            if intent.kind == "image":
-                asset = self._adapter.stage_image(data, media_type=intent.content_type)
-            else:
-                asset = self._adapter.stage_file(
-                    data, media_type=intent.content_type, kind=intent.kind
-                )
-            if not isinstance(asset, dict) or asset.get("kind") != intent.kind:
-                raise UploadError("Provider did not confirm this reference type")
-            current = self._transition(current, UploadState.UPLOADING, upload_id=asset.get("id"))
-        except StoreError:
-            raise
-        except Exception:
-            self._transition(current, UploadState.INITIALIZATION_UNCERTAIN)
-            raise UploadMutationUncertain(
-                "Provider reference handoff is uncertain; do not send it again"
-            ) from None
-        return self._transition(current, UploadState.IMPORTED, asset_id=asset["id"])
 
     def cancel_prepared(self, request_id, *, expected_revision):
         """Cancel only unclaimed local intent, retaining sources without remote work."""
@@ -621,13 +575,6 @@ class UploadCommands:
             },
         )
         try:
-            from ..providers.base import ProviderAdapter
-
-            if isinstance(self._adapter, ProviderAdapter):
-                asset = self._adapter.asset(current.upload_id)
-                if asset.get("id") != current.upload_id or asset.get("kind") != current.intent.kind:
-                    raise UploadError("Provider returned another reference identity or kind")
-                return self._transition(current, UploadState.IMPORTED, asset_id=asset["id"])
             response = self._adapter.upload(current.upload_id)
         except Exception:
             raise UploadError("Could not retrieve the known upload") from None

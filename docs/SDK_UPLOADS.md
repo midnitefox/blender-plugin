@@ -398,7 +398,7 @@ and local MCP recovery controls use these commands as described below.
 facade over the selected `JobSession`, scoped upload store and existing workers.
 `upload_reference` starts one explicitly authorized local-file upload, with an
 explicit `kind` of `image` (the default), `audio`, `video` or `3d`, for the
-[files an agent may upload](MCP.md#agent-file-uploads) only; `capture_reference`
+[files an agent may upload](MCP.md#historical-upstream-reference) only; `capture_reference`
 prepares a viewport/camera still or clip, or a selected-mesh GLB first. Both
 return a session-owned handle immediately. Poll `reference_upload_status` until
 the saved state is `imported`, then pass its `asset_id` to the intended model or
@@ -559,7 +559,7 @@ MCP `render_form(action=prepare)` uses these same role-tagged slots and guarded
 uploads. Configure and inspect are local form actions; quote and submission do
 not initiate an upload. Explicit reference removal requires its current slot key
 and leaves saved upload work intact. See the
-[MCP render sequence](MCP.md#preparing-render-image-and-render-video).
+[MCP render sequence](MCP.md#historical-upstream-reference).
 An unloaded or list-only model schema is a temporary state, not an edited input.
 In-flight bindings wait for model inputs before attachment and recheck the kind
 when they load. Saved assets retain their scope checks; request construction

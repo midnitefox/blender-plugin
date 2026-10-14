@@ -7,7 +7,7 @@ import textwrap
 import bpy
 from bpy.props import EnumProperty, StringProperty
 
-from ..core.ui.costs import format_approved_cost
+from ..core.ui.costs import format_cu
 from . import runtime
 from .prompt_jobs import LABELS
 
@@ -123,7 +123,7 @@ def draw_prompt_status(layout, lane_state, lane):
     if item is None:
         return
     if item.phase == "READY":
-        layout.label(text=f"Cost: {format_approved_cost(item.cost)}")
+        layout.label(text=f"Cost: {format_cu(item.cost)} CU")
         row = layout.row()
         row.enabled = (
             lane_state.prompt == item.original_text and lane_state.model_id == item.model_id

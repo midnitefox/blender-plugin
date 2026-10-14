@@ -188,7 +188,7 @@ class BlockoutJobs:
                     if item.phase == "QUOTING":
                         self._binding(item, item.scene)
                         item.quote = self.session.deliver(completion, lambda value, *_: value)
-                        item.cost, item.phase = item.quote.estimate.approval_amount, "READY"
+                        item.cost, item.phase = str(item.quote.estimate.cost), "READY"
                         continue
                     if item.phase == "READING":
                         self.session.deliver(

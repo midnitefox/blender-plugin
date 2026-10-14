@@ -306,7 +306,7 @@ vendor executable code and extension ZIP were unchanged. The earlier attempt
 could not access the window; it was not counted as interaction evidence.
 This check does not establish live provider quality, other OS desktop support
 or full Materials acceptance. See the
-[user guide](../USER_GUIDE.md#materials) for the approval and result screenshots.
+[user guide](../USER_GUIDE.md#historical-upstream-reference) for the approval and result screenshots.
 
 
 ## Completed-result reuse approval
@@ -328,7 +328,7 @@ selection, front-view keyboard input, zoom and material-property inspection
 worked. Blender exited cleanly with the normal-profile fingerprint unchanged.
 The test-only app copy had a distinct bundle identifier and local ad-hoc signature;
 vendor executable code and extension ZIP were unchanged. See the
-[user guide screenshots](../USER_GUIDE.md#reuse-saved-results). This does not establish
+[user guide screenshots](../USER_GUIDE.md#historical-upstream-reference). This does not establish
 live provider quality, other OS desktop support or release acceptance. An
 earlier window-targeting attempt was not counted as interaction proof.
 

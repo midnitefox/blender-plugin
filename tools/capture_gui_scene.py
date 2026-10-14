@@ -59,63 +59,16 @@ def prepare():
     print("Capture GPU:", gpu.platform.backend_type_get(), gpu.platform.renderer_get(), flush=True)
     if bpy.app.online_access or os.environ.get("SCENARIO_GUI_PROBE") != "1":
         raise RuntimeError("Capture requires offline mode and the GUI probe guard")
-    if VIEW == "composer" and LANE == "audio":
-        raise RuntimeError("The composer has no audio lane")
+    if VIEW != "sidebar" or FIXTURE != "empty":
+        raise RuntimeError(
+            "This extension has an assistant sidebar; use --view sidebar --fixture empty"
+        )
     name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("." + EXTENSION_ID))
     module = importlib.import_module(name)
     if Path(module.__file__).resolve().parent != Path(INSTALLED).resolve():
         raise RuntimeError("Extension loaded outside verified installation")
-    window, area, _ = view3d()
-    area.spaces.active.show_region_ui = VIEW == "sidebar"
-    runtime = importlib.import_module(name + ".blender.runtime")
-    # All writable plugin paths remain inside this capture, including any manager
-    # created by the ordinary GUI pump. These credentials are deliberately fake.
-    runtime.prefs().output_dir = str(OUTPUT / "profile" / "outputs")
-    if FIXTURE == "form":
-        runtime.prefs().provider_mode = "SCENARIO"
-        runtime.prefs().api_key = runtime.prefs().api_secret = "offline-screenshot-fixture"
-        catalog = importlib.import_module(name + ".core.api.catalog")
-        handlers = importlib.import_module(name + ".blender.handlers")
-        record = catalog.ModelRecord.from_api(
-            {
-                "id": "model_offline-screenshot",
-                "name": "Offline fixture",
-                "type": "custom",
-                "capabilities": [
-                    {
-                        "image": "txt2img",
-                        "video": "txt2video",
-                        "3d": "txt23d",
-                        "audio": "txt2audio",
-                    }[LANE]
-                ],
-                "inputs": [
-                    {
-                        "name": "prompt",
-                        "type": "string",
-                        "prompt": True,
-                        "required": {"always": True},
-                    },
-                    {"name": "seed", "type": "integer", "default": 42},
-                ],
-            }
-        )
-        handlers.dispatch(
-            ("catalog", {"privacy": "public", "records": [record], "detailed": [record]})
-        )
-        lane_state = bpy.context.scene.scenario.lane_state(LANE)
-        lane_state.model_id = record.id
-        lane_state.model_key = record.id
-        runtime.state.account_label = "Offline screenshot fixture"
-    bpy.context.scene.scenario.lane = LANE
-    bpy.context.scene.scenario.lane_state(
-        LANE
-    ).prompt = "A small ceramic robot tending a rooftop garden"
-    if VIEW == "composer":
-        state = runtime.state.composer
-        state.expanded = True
-        state.sync_from_lane(bpy.context.scene)
-        state.focused = False
+    _, area, _ = view3d()
+    area.spaces.active.show_region_ui = True
     area.tag_redraw()
 
 
@@ -175,55 +128,27 @@ def verify_mcp_captures():
     return results
 
 
-def capture_credential_preferences(window, area, complete):
-    """Wait for each preference layout to draw before capturing its native window."""
+def capture_assistant_preferences(window, area, complete):
+    """Wait for the native assistant preferences to draw before capturing them."""
     name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith("." + EXTENSION_ID))
-    prefs = bpy.context.preferences.addons[name].preferences
-    runtime = importlib.import_module(name + ".blender.runtime")
-    sources = iter(
-        (
-            ("AGENT", "PREFERENCES", False, "assistant"),
-            ("SCENARIO", "PREFERENCES", True, "preferences"),
-            ("SCENARIO", "ENVIRONMENT", False, "environment"),
-        )
-    )
-    original_mode = prefs.provider_mode
     area.type = "PREFERENCES"
     with bpy.context.temp_override(window=window, area=area):
         bpy.ops.preferences.addon_show(module=name)
-    prefs.api_key = prefs.api_secret = "offline-preferences-fixture"
+    area.tag_redraw()
 
-    def select_next():
-        selection = next(sources, None)
-        if selection is None:
-            prefs.credential_source = "PREFERENCES"
-            prefs.provider_mode = original_mode
-            complete()
-            return
-        mode, source, valid, capture_name = selection
-        prefs.provider_mode = mode
-        prefs.credential_source = source
-        if runtime.credentials().valid != valid:
-            raise RuntimeError("Credential source did not select the expected offline pair")
-        area.tag_redraw()
+    def capture_selected():
+        destination = OUTPUT / "preferences-assistant.png"
+        with bpy.context.temp_override(window=window, area=area):
+            if CAPTURE_BACKEND == "blender":
+                if bpy.ops.screen.screenshot(filepath=str(destination)) != {"FINISHED"}:
+                    raise RuntimeError("Preferences screenshot did not finish")
+            else:
+                capture_x11(destination)
+        if not destination.is_file():
+            raise RuntimeError("Preferences screenshot file is missing")
+        complete()
 
-        def capture_selected():
-            destination = OUTPUT / f"preferences-{capture_name}.png"
-            with bpy.context.temp_override(window=window, area=area):
-                if CAPTURE_BACKEND == "blender":
-                    if bpy.ops.screen.screenshot(filepath=str(destination)) != {"FINISHED"}:
-                        raise RuntimeError("Preferences screenshot did not finish")
-                else:
-                    capture_x11(destination)
-            if not destination.is_file():
-                raise RuntimeError("Preferences screenshot file is missing")
-            select_next()
-
-        # Return to Blender's event loop so the window presents the new layout.
-        # Synchronous redraw_timer calls can still capture the previous frame.
-        bpy.app.timers.register(guarded(capture_selected), first_interval=1.0)
-
-    select_next()
+    bpy.app.timers.register(guarded(capture_selected), first_interval=1.0)
 
 
 def inspect_screenshot(path):
@@ -290,14 +215,8 @@ def capture():
     window, area, region = view3d()
     if bpy.app.online_access:
         raise RuntimeError("Online access changed during capture")
-    lane_state = bpy.context.scene.scenario.lane_state(LANE)
-    if FIXTURE == "form" and (
-        lane_state.model_id != "model_offline-screenshot"
-        or lane_state.model_key != "model_offline-screenshot"
-    ):
-        raise RuntimeError("Synthetic fixture model is not selected")
     if VIEW == "sidebar" and (region.width <= 1 or region.active_panel_category != DISPLAY_NAME):
-        raise RuntimeError("Scenario sidebar is not active")
+        raise RuntimeError("Open Studio sidebar is not active")
     with bpy.context.temp_override(window=window, area=area):
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
         if CAPTURE_BACKEND == "blender":
@@ -311,11 +230,7 @@ def capture():
     active_sidebar = region.active_panel_category
 
     report = {
-        "credential_captures": [
-            "preferences-assistant.png",
-            "preferences-preferences.png",
-            "preferences-environment.png",
-        ],
+        "preference_captures": ["preferences-assistant.png"],
         "mcp_captures": mcp_captures,
         "blender_version": list(bpy.app.version),
         "blender": bpy.app.version_string,
@@ -325,7 +240,6 @@ def capture():
         "view": VIEW,
         "lane": LANE,
         "fixture": FIXTURE,
-        "selected_model_id": lane_state.model_id,
         "active_sidebar": active_sidebar,
         "image_size": dimensions,
         "capture_backend": CAPTURE_BACKEND,
@@ -333,7 +247,7 @@ def capture():
         "gpu_renderer": gpu.platform.renderer_get(),
         "distinct_rgb_samples": sample_count,
     }
-    capture_credential_preferences(
+    capture_assistant_preferences(
         window, area, lambda: capture_extension_permissions(window, area, report)
     )
 

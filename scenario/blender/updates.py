@@ -6,7 +6,9 @@ import bpy
 
 from .. import __version__
 
-GUIDE_URL = "https://github.com/midnitefox/blender-plugin"
+GUIDE_URL = (
+    "https://github.com/midnitefox/blender-plugin/blob/feat/provider-choice/docs/USER_GUIDE.md"
+)
 RELEASES_URL = "https://github.com/midnitefox/blender-plugin/releases"
 
 

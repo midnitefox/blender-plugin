@@ -4,7 +4,7 @@ import pathlib
 import unittest
 
 import bpy
-from helpers import addon, addon_name, submodule, temp_credentials
+from helpers import addon, addon_name, submodule
 
 
 class RegisterTests(unittest.TestCase):
@@ -19,9 +19,9 @@ class RegisterTests(unittest.TestCase):
         ).group(1)
         self.assertEqual(mod.__version__, manifest)
         prefs = bpy.context.preferences.addons[addon_name()].preferences
-        self.assertEqual(prefs.bl_rna.properties["output_dir"].default, "~/Downloads/Open Studio")
+        self.assertNotIn("output_dir", prefs.bl_rna.properties)
         self.assertEqual(prefs.mcp_port, 9876)
-        self.assertTrue(prefs.composer_enabled)
+        self.assertFalse(prefs.mcp_allow_python)
 
     def test_runtime_paths_live_outside_the_extension_dir(self):
         runtime = submodule("blender.runtime")
@@ -32,7 +32,7 @@ class RegisterTests(unittest.TestCase):
         )
         self.assertTrue(paths.state_dir.exists())
 
-    def test_credentials_resolve_from_prefs(self):
-        runtime = submodule("blender.runtime")
-        with temp_credentials():
-            self.assertTrue(runtime.credentials().valid)
+    def test_preferences_do_not_register_service_credentials(self):
+        prefs = bpy.context.preferences.addons[addon_name()].preferences
+        for name in ("api_key", "api_secret", "project_id", "provider_mode", "provider_profiles"):
+            self.assertNotIn(name, prefs.bl_rna.properties)

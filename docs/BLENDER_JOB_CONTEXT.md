@@ -607,7 +607,7 @@ token and session it requested them in: a different token or session,
 late status is never drawn. Background Blender registers no timer, so headless
 loops decode no images and their decode requests expire.
 
-Local MCP [`inspect_result_previews`](MCP.md#saved-result-previews) uses the
+Local MCP [`inspect_result_previews`](MCP.md#historical-upstream-reference) uses the
 same scheduler from Blender's main thread. It checks the context token, saved
 revision and previewable state, requests the stills of every result the preview
 controller's `tile_targets` ranks, which the tiles page through four at a time,
@@ -727,7 +727,7 @@ as before: its reviews are discarded, queued work is cancelled unsent, a write
 in flight finishes but the guard refuses later ones, and the late outcome cannot
 be delivered to the replacement session. Inspect the assets in the Library of
 the right connection; nothing is resent automatically. The local
-[MCP organization tools](MCP.md#asset-organization) use this owner and accept a
+[MCP organization tools](MCP.md#historical-upstream-reference) use this owner and accept a
 review only with the `job_context_id` issued alongside it, so a replaced session
 rejects an old context. The native Library's
 [Organize dialog and review card](ui/studio-and-library.md#library-organization) use the same
@@ -1142,7 +1142,7 @@ classifies a finished decision task as `applied`, `refused`, `uncertain` or
 `not_sent` without draining its completion, which `poll` still owns.
 
 MCP `workflow_job_steps` and `decide_workflow_step` call these entries and
-`runtime.decide_workflow_step`; see [workflow step decisions](MCP.md#workflow-step-decisions).
+`runtime.decide_workflow_step`; see [workflow step decisions](MCP.md#historical-upstream-reference).
 
 ### Native review of waiting steps
 

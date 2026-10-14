@@ -207,7 +207,7 @@ full render-lane desktop acceptance.
   with Blender 5.0.1, 5.1.2 and 5.2.1. 0.10.0 is the first release the repository
   offers, so an update from one published release to the next, keeping
   preferences and stored jobs, will be verified with the next release (see the
-  [user guide](USER_GUIDE.md#updates)).
+  [user guide](USER_GUIDE.md#historical-upstream-reference)).
 
 ## Creation and scene application
 
@@ -305,7 +305,7 @@ full render-lane desktop acceptance.
   Library selection or a typed asset ID. A snapshot upload that is still sending
   stops for good after a scene edit, frame change, render or undo, and a chosen
   file's after undo or redo; it does not resume, so the content is uploaded again
-  (see the [user guide](USER_GUIDE.md#run-a-workflow)). That a chosen file keeps
+  (see the [user guide](USER_GUIDE.md#historical-upstream-reference)). That a chosen file keeps
   uploading through a real render or timeline playback was only simulated in
   tests.
   Workflow and generation-form uploads share 128 upload handles; finished
@@ -400,7 +400,7 @@ full render-lane desktop acceptance.
   [#440](https://github.com/scenario-labs/blender-plugin/issues/440) work. Local
   MCP `inspect_result_previews` reads the same envelope as bounded levels,
   without an image, and no MCP tool launches a player or plays audio. See the
-  [supported limits](USER_GUIDE.md#audio).
+  [supported limits](USER_GUIDE.md#historical-upstream-reference).
 - **Play audio** starts a separate offline Blender process for each playback,
   so sound starts after that process does: 0.6 to 0.85 seconds on macOS arm64
   with Blender 5.0.1 to 5.2.1, measured with a digitally silent file; Windows

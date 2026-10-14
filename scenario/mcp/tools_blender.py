@@ -95,11 +95,11 @@ def execute_python(args):
     prefs = prefs_module.get_prefs()
     if prefs is None:
         raise PermissionError(
-            "Scenario preferences are not available; Python execution stays disabled"
+            "Open Studio preferences are not available; Python execution stays disabled"
         )
     if not prefs.mcp_allow_python:
         raise PermissionError(
-            "Python execution is disabled in Scenario preferences (MCP > Allow connected agents to run Python)"
+            "Python execution is disabled in Open Studio preferences (Local assistant connection > Allow connected assistants to run Python)"
         )
     code = args.get("code") or ""
     if not code.strip():
@@ -110,7 +110,7 @@ def execute_python(args):
         return sandbox.run_python(code)
     finally:
         # Like Blender's Run Script, which records Undo: the code may change anything.
-        file_state.mark_modified("Scenario MCP Python")
+        file_state.mark_modified("Open Studio MCP Python")
 
 
 def _selection():
@@ -120,7 +120,7 @@ def _selection():
 
 def select_objects(args):
     names = set(args.get("names") or [])
-    with file_state.marking("Scenario MCP selection", _selection):
+    with file_state.marking("Open Studio MCP selection", _selection):
         for obj in bpy.context.view_layer.objects:
             obj.select_set(obj.name in names)
         first = next((bpy.data.objects[n] for n in names if n in bpy.data.objects), None)
@@ -137,7 +137,7 @@ def set_frame(args):
     frame = int(args["frame"])
     # frame_set also resets the subframe.
     with file_state.marking(
-        "Scenario MCP frame", lambda: (scene.frame_current, scene.frame_subframe)
+        "Open Studio MCP frame", lambda: (scene.frame_current, scene.frame_subframe)
     ):
         scene.frame_set(frame)
     return {"frame_current": scene.frame_current}
@@ -187,7 +187,7 @@ def render_still(args):
 
 
 def camera_path(args):
-    """Build an animated camera for the Render Video lane: from explicit waypoints, or from a preset around the subject."""
+    """Build an animated scene camera: from explicit waypoints, or from a preset around the subject."""
     from ..blender import shot_planner
     from ..core.scene import shot_plan
 
@@ -250,7 +250,7 @@ def camera_path(args):
         camera, keyframes, last_frame = shot_planner.build_path(context)
     finally:
         # Every step above changes the scene: a failure part-way still marks it.
-        file_state.mark_modified("Scenario camera path")
+        file_state.mark_modified("Open Studio camera path")
     return {
         "camera": camera.name,
         "keyframes": keyframes,
@@ -260,7 +260,7 @@ def camera_path(args):
         "duration": props.duration,
         "focal": props.focal,
         "markers": len(shot_planner.marker_objects(scene)),
-        "note": "The scene camera now follows this path; Render Video (Camera clip) records it.",
+        "note": "The scene camera now follows this path. Review the animation on the timeline.",
     }
 
 
@@ -346,7 +346,6 @@ SPECS = (
             "Returns: file, objects[] (name, type, location, dimensions, parent, collections, materials, hidden), active, selected, cameras, scene_camera, frame_range, frame_current, fps, resolution, unit_system, cursor and blender version.\n"
             "Example: {}.\n"
             "Prefer object_detail for one object's geometry or modifiers; this does not return mesh vertex data.\n"
-            "No platform equivalent."
         ),
         _schema({}),
         scene_summary,
@@ -361,7 +360,6 @@ SPECS = (
             "Returns: name, type, location, rotation_euler, scale, dimensions, parent, modifiers and custom_properties. Meshes also return vertices, faces, uv_layers and materials; cameras return lens_mm, sensor_width and clip. An unknown name raises ValueError.\n"
             'Example: {"name": "Cube"}.\n'
             "Prefer scene_summary to discover names first; this does not change the object.\n"
-            "No platform equivalent."
         ),
         _schema({"name": {"type": "string"}}, ["name"]),
         object_detail,
@@ -373,10 +371,9 @@ SPECS = (
             "Run arbitrary Python with bpy on Blender's main thread, only when explicitly enabled in preferences.\n"
             "Args:\n"
             "  - code: required string, Python source; bpy and a result dict are preloaded.\n"
-            "Returns: result, stdout and stderr; failures also include error. Disabled by default unless the user enables Allow connected agents to run Python. Common quit, factory-reset, preference-reload and file-deletion call spellings are blocked; this is not a security sandbox.\n"
+            "Returns: result, stdout and stderr; failures also include error. Disabled by default unless the user enables Allow connected assistants to run Python. Common quit, factory-reset, preference-reload and file-deletion call spellings are blocked; this is not a security sandbox.\n"
             'Example: {"code": "result[\'objects\'] = len(bpy.data.objects)"}.\n'
             "Check blender_api_help first and prefer specific tools instead of arbitrary code.\n"
-            "No platform equivalent."
         ),
         _schema(
             {
@@ -399,7 +396,6 @@ SPECS = (
             "Returns: selected and missing name lists. A matching object becomes active; do not rely on array order to choose it.\n"
             'Example: {"names": ["Cube"]}.\n'
             "Prefer scene_summary to verify names and the existing selection before changing it.\n"
-            "No platform equivalent."
         ),
         _schema({"names": {"type": "array", "items": {"type": "string"}}}, ["names"]),
         select_objects,
@@ -412,8 +408,7 @@ SPECS = (
             "  - frame: required integer, the desired frame number.\n"
             "Returns: frame_current, the scene's resulting frame.\n"
             'Example: {"frame": 42}.\n'
-            "Prefer scene_summary to check the frame range first; this changes the current scene state and may invalidate a pending generation estimate.\n"
-            "No platform equivalent."
+            "Prefer scene_summary to check the frame range first; this changes the current scene state.\n"
         ),
         _schema({"frame": {"type": "integer"}}, ["frame"]),
         set_frame,
@@ -426,7 +421,6 @@ SPECS = (
             "Returns: PNG image content for the MCP client, not a permanent file path.\n"
             "Example: {}.\n"
             "Do not use in background mode or without a 3D viewport: it raises RuntimeError. Prefer render_still for a camera or viewport still at a chosen size. Temporary capture files are cleaned up.\n"
-            "No platform equivalent."
         ),
         _schema({}),
         screenshot_viewport,
@@ -435,7 +429,7 @@ SPECS = (
     ToolSpec(
         "camera_path",
         (
-            "Build an animated scene camera from a preset, description or explicit waypoints for Render Video.\n"
+            "Build an animated scene camera from a preset, description or explicit waypoints.\n"
             "Args:\n"
             "  - preset: optional string from shot_plan.PRESETS or PRESET_ALIASES, such as orbit or push_in.\n"
             "  - description: optional free text, such as slow orbit, 8 s, 35mm; parsed values override preset, duration and focal.\n"
@@ -445,8 +439,7 @@ SPECS = (
             "  - waypoints: optional array of objects, each requiring position [x, y, z]; rotation_euler [x, y, z], focal and hold are optional. Explicit waypoints replace existing markers.\n"
             "Returns: camera, keyframes, frame_start, frame_end, preset, duration, focal, markers and note.\n"
             'Example: {"preset": "orbit", "duration": 8, "focal": 35}.\n'
-            "Prefer scene_summary first; this changes the scene camera and animation, it does not generate a cloud video.\n"
-            "No platform equivalent."
+            "Prefer scene_summary first; this changes the scene camera and animation. Review the resulting timeline.\n"
         ),
         _schema(
             {
@@ -482,7 +475,6 @@ SPECS = (
             "Returns: PNG image content, with temporary capture files cleaned up.\n"
             'Example: {"source": "CAMERA", "width": 1280, "height": 720}.\n'
             "Do not use in background mode: capture needs the GUI and a 3D viewport or raises RuntimeError. Prefer screenshot_viewport to inspect the visible viewport UI.\n"
-            "No platform equivalent."
         ),
         _schema(
             {
@@ -503,7 +495,6 @@ SPECS = (
             "Returns: path, type, doc when available, properties[] or members[] when exposed; invalid or missing paths return error.\n"
             'Example: {"path": "bpy.ops.mesh.primitive_cube_add"}.\n'
             "Prefer this to guessing API signatures, and use specific scene tools instead of execute_python where possible. This is introspection, not execution of the named operator.\n"
-            "No platform equivalent."
         ),
         _schema(
             {
@@ -525,7 +516,6 @@ SPECS = (
             "Returns: filepath, counts (objects, meshes, materials, images, collections, cameras, lights, armatures, curves, node_groups, textures, actions, worlds, scenes when available) and up to 40 collection names.\n"
             "Example: {}.\n"
             "Prefer scene_summary for selection and object transforms, or object_detail for a named object; counts alone do not establish what is visible.\n"
-            "No platform equivalent."
         ),
         _schema({}),
         datablocks_summary,

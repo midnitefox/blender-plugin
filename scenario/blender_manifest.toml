@@ -4,7 +4,7 @@ schema_version = "1.0.0"
 id = "open_studio"
 version = "0.11.0"
 name = "Open Studio"
-tagline = "Create with your chosen AI and local Blender tools"
+tagline = "Create with your connected assistant and local Blender tools"
 maintainer = "midnitefox"
 type = "add-on"
 website = "https://github.com/midnitefox/blender-plugin"
@@ -40,9 +40,9 @@ wheels = [
 ]
 
 [permissions]
-network = "Chosen AI services and local agents on 127.0.0.1"
-files = "Save generated media to disk and import it into the scene"
-clipboard = "Copy asset ids, errors and MCP setup; paste into the prompt"
+network = "Connect local assistants on 127.0.0.1"
+files = "Read assistant images and save local project output"
+clipboard = "Copy setup instructions for your assistant"
 
 [build]
 paths_exclude_pattern = [

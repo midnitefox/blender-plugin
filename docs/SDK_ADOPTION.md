@@ -1088,7 +1088,7 @@ and [schema 10](JOB_STORAGE.md#schema-10-declared-originals-and-lane-defaults).
 ## Panorama model contracts
 
 The [panorama contracts](../scenario/core/scene/panorama_contract.py) behind the
-native and MCP [Environment lane](MCP.md#environment-lane-360-panoramas) use no
+native and MCP [Environment lane](MCP.md#historical-upstream-reference) use no
 new SDK method, extension or raw fallback. The native form quotes and submits
 through the same `ModelJobs` session commands as MCP. Model records come from
 `models.with_raw_response.retrieve`; quotes and the single submission use
@@ -1300,7 +1300,7 @@ The shared [organization review commands](JOB_COORDINATOR.md#asset-organization-
 call these methods through the coordinator, its workers and the JobSession
 review owner, with a guard before each write and a `get_bulk` read-back. After
 `AlreadyMembers`, they send only the assets read back as not yet members, within
-three add requests per review. The local [MCP organization tools](MCP.md#asset-organization)
+three add requests per review. The local [MCP organization tools](MCP.md#historical-upstream-reference)
 and the native [Library organization](ui/studio-and-library.md#library-organization) controls
 prepare, apply and inspect those reviews. Live evidence is in the
 [release record](maintenance/release-acceptance.md#library-organization);

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Open Studio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Independent package identity and fail-fast protection for legacy RNA names."""
 
 from pathlib import Path

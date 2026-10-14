@@ -1,138 +1,98 @@
 # Open Studio for Blender
 
-Use Blender with Codex ImageGen, another connected assistant, local ComfyUI workflows,
-or a compatible AI API. Open Studio is a development fork of
+Connect an assistant to Blender to inspect your scene, create camera moves, and
+bring assistant-generated images into your project. Open Studio is an
+assistant-only development fork of
 [Scenario for Blender](https://github.com/scenario-labs/blender-plugin), maintained
 in [midnitefox/blender-plugin](https://github.com/midnitefox/blender-plugin).
 It retains the upstream GPL license and copyright notices.
 
-**Development preview:** provider selection and assistant image handoff are under
-active integration. Full end-to-end parity across 3D, rigging, motion, materials,
-video, environments and sound has not yet been verified. The detailed upstream
-guides describe the inherited Scenario workflow; availability with another
-provider depends on its supported models and declared workflow recipes.
+**Development preview:** the current workflow supports local scene tools and
+image handoff. Full creative feature parity with the upstream extension is
+incomplete. Automated 3D generation, rigging, motion, complete PBR materials,
+video, panorama and audio workflows are not exposed in this build.
 
-## Requirements
+## Install and connect
 
-- Blender 5.0 or later. Development checks use an isolated Blender profile.
-- For Codex image work: Codex with ImageGen and a connection to the local Blender
-  MCP server. This route needs no Scenario account, separate image API key or
-  ComfyUI installation.
-- For direct generation: a configured provider that supports the requested media
-  type. Chat API compatibility alone does not provide image, video, audio or 3D.
-- Blender's Allow Online Access must be on for the local MCP server and provider
-  connections. Local image import itself makes no network requests.
+1. Use Blender 5.0 or later. Download the extension ZIP from this fork's
+   [releases](https://github.com/midnitefox/blender-plugin/releases) when a build
+   is available, or use a ZIP built from this checkout.
+2. In Blender, open **Edit > Preferences > Get Extensions**, open the menu in
+   the upper right and choose **Install from Disk**. Select the ZIP and enable
+   **Open Studio**. Disable an older copy before installing this build.
+3. Open the 3D viewport sidebar with **N**, then **Open Studio** in the viewport sidebar.
+   Allow Blender's online access for the local MCP listener and start the server.
+4. Copy the setup for your assistant from that panel. The Codex setup uses the
+   included stdio bridge and a private connection file, which follows Blender's
+   current local port and token. Keep Blender open, then reconnect MCP in the
+   assistant.
+5. Ask the assistant to inspect your Blender scene. For an image, ask it to use
+   its own image-generation tool and import the result into Blender.
 
-## Install
+Open Studio requires no generation account, API key, model selection or credits
+configuration. Image generation happens in your assistant and follows that
+assistant's availability and account settings. The extension cannot invoke the
+assistant's image-generation tool itself.
 
-Use an **Open Studio** development ZIP from this fork, then open Blender's
-Edit > Preferences > Get Extensions > Install from Disk. Keep the ZIP zipped.
-The extension appears as Open Studio in Add-ons and the viewport sidebar.
+## Work with images
 
-Disable the original Scenario extension before enabling Open Studio. This preview
-retains some inherited internal Blender names and refuses to enable alongside the
-original. It has a distinct extension ID and never registers Scenario's update feed.
+The assistant calls `agent_workspace`, saves or copies its generated image into
+the returned inbox, and calls `import_agent_image` with the filename. Supported
+files are PNG, JPEG and WebP, up to 64 MiB per image.
 
-### Updates
+| Import mode | Result in Blender |
+| --- | --- |
+| `REFERENCE` | An image reference at the 3D cursor for concept art or modeling. |
+| `TEXTURE` | A new base-color material in a named mesh's active slot. The mesh needs UV coordinates. |
+| `IMAGE` | A packed image datablock for later work. |
 
-Check [this fork's releases](https://github.com/midnitefox/blender-plugin/releases)
-for explicitly published builds. Install updates from disk. A development branch
-or passing unit test does not establish a released or fully verified build.
+Save the `.blend` file to retain the packed image. A base-color image supplies
+one material input; full PBR maps and mesh generation need additional workflows
+that are not implemented in this build.
 
-## Quick start
+## Local Blender control
 
-1. Open **Open Studio > Choose AI**. The default is **Codex / external assistant**.
-2. Start the assistant connection and copy the Codex setup. Ask Codex to configure
-   that local connection. The connection file follows Blender restarts, including
-   a changed local port or token; saved setup does not contain a fixed bearer token.
-3. Ask Codex, for example: **Create a painted stone concept image with ImageGen
-   and add it as a reference in my Blender scene.**
-4. Codex calls `agent_workspace`, saves or copies its generated image into the
-   returned inbox, and calls `import_agent_image`. You can request `REFERENCE`,
-   `IMAGE`, or a `TEXTURE` on a named mesh with UVs.
-5. Save the blend file. Imported images are packed so temporary image cleanup
-   does not remove them from the saved project.
+Connected assistants can inspect objects and datablocks, change selection and
+the timeline, build a camera path, and capture a viewport or quick camera still.
+Captures require Blender's graphical interface. Arbitrary Python execution is
+separately controlled by **Allow connected assistants to run Python** and is off by
+default. The image handoff and dedicated scene tools work with that option off.
 
-Codex orchestrates its own ImageGen tool and the Blender handoff. Blender cannot
-invoke Codex's built-in image tool directly. An image texture supplies base color;
-a full PBR set, 3D mesh or animation needs the corresponding workflow.
+For an isolated headless session, the extension registers:
 
-## Features
+```sh
+blender --background --online-mode --command open_studio --port 9876
+```
 
-The inherited scene tools include image/mesh/material/media application, camera
-paths, validated greybox plans, timeline captures, environments and local MCP.
-Provider support is explicit:
+The headless server uses local authentication and writes its connection details
+to a private file. Viewport screenshots and quick OpenGL captures require the
+GUI. See [MCP setup and security](docs/MCP.md) for connection details and limits.
 
-| Connection | Intended use | Setup |
-| --- | --- | --- |
-| Codex / external assistant | Images created by the assistant, imported locally | Local MCP connection; no generation API credentials |
-| ComfyUI | Local or hosted graph workflows, including specialized installed models | Running server, checkpoint for basic images, explicit recipes for other workflows |
-| OpenAI-compatible API | Configured text, image generation/editing and speech endpoints | Base URL, applicable key, model IDs and explicit capability selection |
-| fal | Optional model-specific 3D, material, video and audio workflows | API key and a supported preset; integration in progress |
-| Scenario | Existing Scenario generation and cloud features | Scenario API key/secret and applicable credits |
+## Privacy and help
 
-Unavailable capabilities are not interchangeable. Music and sound effects need
-appropriate models; speech support does not imply either. Rigging and preset
-animation do not establish text-to-motion support.
+Image import reads from the extension's local inbox and packs the pixels into
+Blender. A connected assistant can receive the scene data and captures requested
+through MCP. Image generation performed by the assistant follows its own
+service policies. Keep the local token and connection file private.
 
-Exact Scenario prices retain their CU units. Other connections can return no
-price quote; the UI states that cost is not quoted, and API tools require the
-`provider-billed` approval token. Local compute and hosted billing are described
-by the selected connection. Uncertain submissions are not automatically retried.
+- [User guide](docs/USER_GUIDE.md): installation, image handoff and troubleshooting.
+- [MCP reference](docs/MCP.md): local tool contracts and client setup.
+- [Privacy](docs/PRIVACY.md): data handling and Python permissions.
+- [Support](SUPPORT.md): fork issues and useful diagnostic information.
+- [Documentation index](docs/index.md): current guides and inherited source references.
 
-## Agents (MCP)
-
-Start with `scene_summary`. For native assistant image generation, use
-`agent_workspace` and `import_agent_image`; these tools do not require provider
-credentials or the arbitrary Python execution permission. The inbox accepts
-bounded PNG, JPEG and WebP files by basename, with an optional SHA-256 check.
-
-The local MCP server uses authenticated loopback HTTP. The copied Codex setup
-uses a local stdio bridge and private connection file, refreshed when Blender
-starts the server. Treat the connection file as a credential. Keep Blender running
-while using its tools. Arbitrary Python execution remains separately opt-in.
-
-See the [MCP reference](docs/MCP.md) for inherited tool contracts and the
-[privacy guide](docs/PRIVACY.md) for upstream Scenario behavior.
-
-## What leaves your machine
-
-The assistant image handoff reads a file from the extension's inbox and packs it
-locally. Any image generation performed by Codex follows Codex's own service and
-account settings. Direct provider generation sends its prompts and selected
-references to the configured service. ComfyUI may run locally or remotely.
-Scenario's optional path continues to use Scenario APIs and storage.
-
-Profiles isolate job history, receipts and cached artifacts by connection identity.
-API keys remain in local Blender preferences and are not encrypted by this fork.
-Do not share preferences, connection files or provider keys.
-
-## Documentation
-
-The [documentation index](docs/index.md) links inherited architecture, application
-and development references. Some guides and screenshots still describe upstream
-Scenario. This README is the entry point for the fork's new setup and provider
-choices. [Known upstream limitations](docs/KNOWN_LIMITATIONS.md) also apply where
-those implementations are retained.
-
-## Support
-
-Report fork issues in [midnitefox/blender-plugin](https://github.com/midnitefox/blender-plugin/issues).
-Include the Blender version, provider type, selected workflow and sanitized error.
-Keep keys, tokens and private prompts out of public reports. Provider billing and
-account questions belong with the provider.
+Install updates from this fork's release ZIPs. Historical upstream guides and
+screenshots describe a different generation workflow and do not establish what
+this assistant-only build supports.
 
 ## Development
 
 Read [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and the
-[validation guide](docs/development/validation.md). Use the pinned uv version and
-locked environment. Package through the repository tools so the exact dependency
-wheels and notices are included. Native tests install the actual ZIP into a
-fresh profile and preserve the normal Blender profile.
-
-Protocol fixtures and local loopback tests prove request serialization, storage,
-recovery and error behavior. Live model generation, output quality, GUI interaction
-and each advertised creative workflow require separate acceptance.
+[validation guide](docs/development/validation.md). Follow the current
+assistant-only scope when retained upstream guidance describes service
+integration. Use the pinned uv version and locked environment. Package through
+the repository tools so required dependencies and notices are included. Native
+tests install the actual ZIP into an isolated profile.
 
 ## Licence
 
@@ -145,9 +105,7 @@ and the extension ZIP includes the same GPL text. Bundled dependencies, adopted
 sources and assets retain their original licences and notices; see the
 [SDK bundle](docs/SDK_BUNDLE.md) and [source adoption](docs/STUDIO_ADOPTION.md).
 The [bundled icon notice](scenario/icons/README.md) records the generator, the
-font option and the icons' first-party design origin. Scenario Inc. made the
-exploration gallery covers (`docs/images/exploration-*.png`) and also publishes
-them at [www.scenario.com/explorations](https://www.scenario.com/explorations/).
+font option and the icons' first-party design origin.
 
 [Blender's licence guidance](https://www.blender.org/about/license/) requires a
 GPL-compatible licence for published add-ons using its Python API. The

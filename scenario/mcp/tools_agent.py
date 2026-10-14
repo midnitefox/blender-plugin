@@ -167,7 +167,6 @@ SPECS = [
     ToolSpec(
         "agent_workspace",
         "Get the local image inbox for Codex ImageGen or another assistant's generated assets. "
-        "No Scenario account, API key, ComfyUI or provider connection is required. "
         "Copy a generated PNG/JPEG/WebP into the returned inbox, then use import_agent_image. "
         "Use the assistant's own image-generation tool; Blender cannot invoke it directly.",
         _schema({}),
@@ -181,7 +180,7 @@ SPECS = [
         "TEXTURE applies a new base-color material to the named mesh's active slot, requiring UVs. "
         "This does not generate a full PBR material. Existing other-object materials are preserved. "
         "Packed pixels survive inbox cleanup. Repeating the same image and destination reuses it. "
-        "No external requests, provider credentials or arbitrary Python are needed.",
+        "This local import works with arbitrary Python execution disabled.",
         _schema(
             {
                 "filename": {

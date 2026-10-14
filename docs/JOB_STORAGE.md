@@ -515,7 +515,7 @@ reported for its lane and left unchanged. `render_form` inspection and render
 quotes apply a Render Image form's default the way the GUI pump does.
 
 Local MCP `model_defaults` reads, saves and clears the same rows through the same
-module ([trained models](MCP.md#trained-models-loras-and-compositions)). `get`
+module ([trained models](MCP.md#historical-upstream-reference)). `get`
 returns the owner's `context_id` with each lane's revision and default; `set` and
 `clear` pass that context and revision back, like **Save** and **Clear**, and go
 through the same write path (`trained_defaults.store` and `clear`). A default set

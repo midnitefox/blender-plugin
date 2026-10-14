@@ -21,10 +21,10 @@ from mathutils import Euler, Vector
 
 from ..core.scene import shot_plan
 
-SHOTS_COLLECTION = "Scenario Shots"
-CAMERA_NAME = "Scenario Shot Camera"
+SHOTS_COLLECTION = "Open Studio Shots"
+CAMERA_NAME = "Open Studio Shot Camera"
 TARGET_NAME = "Shot Target"
-AIM_CONSTRAINT = "Scenario Aim"
+AIM_CONSTRAINT = "Open Studio Aim"
 MARKER_PREFIX = "Shot "
 PROP_INDEX, PROP_FOCAL, PROP_HOLD = "scenario_shot_index", "scenario_focal", "scenario_hold"
 FALLBACK_BOX = ((-1.0, -1.0, 0.0), (1.0, 1.0, 2.0))
@@ -711,20 +711,13 @@ def draw_shot_planner(layout, context):
     row = box.row(align=True)
     row.prop(props, "preset", text="")
     row.operator(SCENARIO_OT_shot_place_markers.bl_idname, text="Place markers", icon="PINNED")
-    render_lane = scene.scenario.lane_state("render_video")
-    matched = bool(render_lane is not None and render_lane.match_timeline)
     col = box.column(align=True)
     duration_row = col.row(align=True)
-    duration_row.enabled = (
-        not matched
-    )  # with Match timeline on, the video model duration drives the shot
     duration_row.prop(props, "duration")
     col.prop(props, "focal")
     col.prop(props, "start_frame")
     start, end, fps = frame_range(scene)
     box.label(text=f"Frames {start} to {end} at {fps:g} fps", icon="TIME")
-    if matched:
-        box.label(text=f"Camera path duration: {props.duration:g} s; build the path before capture")
     row = box.row(align=True)
     row.prop(props, "aim_at_subject")
     row.prop(props, "use_selection")

@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Keep the user guide aligned with registered lanes and the Markdown renderer."""
+"""Keep the assistant user guide aligned with local tools and the Markdown renderer."""
 
-import ast
 import re
 import tomllib
 from pathlib import Path
@@ -21,32 +20,32 @@ STALE = re.compile(
 )
 
 
-def test_each_registered_creation_lane_has_a_guide_section():
-    tree = ast.parse((ROOT / "scenario/blender/props.py").read_text())
-    assignment = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "LANE_ITEMS" for target in node.targets
-        )
-    )
-    labels = {row[1] for row in ast.literal_eval(assignment.value)}
-    headings = set(re.findall(r"^### (.+)$", GUIDE.read_text(), re.MULTILINE))
-    assert labels <= headings, f"Missing lane sections: {sorted(labels - headings)}"
+def test_registered_image_handoff_modes_have_guide_instructions():
+    from tools.gen_mcp_docs import parse_specs
+
+    specs = parse_specs(ROOT / "scenario/mcp/tools_agent.py")
+    image_import = next(tool for tool in specs if tool["name"] == "import_agent_image")
+    text = GUIDE.read_text(encoding="utf-8")
+    for mode in image_import["properties"]["mode"]["enum"]:
+        assert f"| `{mode}` |" in text
+    for tool in ("agent_workspace", "import_agent_image", "scene_summary", "camera_path"):
+        assert f"`{tool}`" in text
+    assert "## Assistant connection (MCP)" in text
+    assert "## Local scene and camera tools" in text
+    assert "## Python permission" in text
 
 
 def test_guide_minimum_tracks_the_extension_manifest():
-    manifest = tomllib.loads((ROOT / "scenario/blender_manifest.toml").read_text())
+    manifest = tomllib.loads((ROOT / "scenario/blender_manifest.toml").read_text(encoding="utf-8"))
     minimum = manifest["blender_version_min"]
     if minimum.endswith(".0"):
         minimum = minimum.rsplit(".", 1)[0]
-    assert f"Blender {minimum} or later" in GUIDE.read_text()
+    assert f"Blender {minimum} or later" in GUIDE.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("document", [GUIDE, TEMPLATE], ids=["guide", "template"])
 def test_public_guide_avoids_retired_or_unverified_claims(document):
-    assert not STALE.search(document.read_text())
+    assert not STALE.search(document.read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(
@@ -57,15 +56,14 @@ def test_stale_claim_guard_rejects_regressions(text):
     assert STALE.search(text)
 
 
-def test_every_guide_illustration_exists():
-    images = re.findall(r"!\[[^\]]*\]\((images/[^)]+)\)", GUIDE.read_text())
-    assert images
+def test_any_guide_illustrations_reference_existing_files():
+    images = re.findall(r"!\[[^\]]*\]\((images/[^)]+)\)", GUIDE.read_text(encoding="utf-8"))
     for image in images:
         assert (GUIDE.parent / image).is_file(), image
 
 
 def test_handbook_has_one_generated_body_and_navigation():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
     assert template.count("{{content}}") == 1
     assert template.count("{{toc}}") == 1
     assert template.count("{{version}}") == 2

@@ -226,18 +226,13 @@ class Estimate:
     operation: str
     target_id: str
     project_id: str | None
-    cost: Decimal | None
+    cost: Decimal
     payload_json: bytes = field(repr=False)
     response_json: bytes = field(repr=False)
     scope: object = field(repr=False)
     issued_at: float = field(repr=False)
     # Loop nodes in a quoted workflow definition; None when coverage is unknown.
     loop_steps: int | None = 0
-
-    @property
-    def approval_amount(self):
-        """Exact CU approval or explicit acknowledgment of external billing."""
-        return str(self.cost) if self.cost is not None else "provider-billed"
 
     @property
     def payload(self):

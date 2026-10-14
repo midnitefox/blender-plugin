@@ -7,7 +7,6 @@ extension-user-data path and stable, non-secret scope/origin identities.
 """
 
 import hashlib
-import ipaddress
 import json
 import math
 import os
@@ -83,12 +82,8 @@ class JobScope:
         ):
             raise ValueError("Use a valid API base URL")
         url = urlsplit(self.service)
-        try:
-            local = ipaddress.ip_address(url.hostname or "").is_loopback
-        except ValueError:
-            local = url.hostname == "localhost"
         if (
-            (url.scheme != "https" and not (url.scheme == "http" and local))
+            url.scheme != "https"
             or not url.hostname
             or url.username
             or url.password
@@ -96,9 +91,7 @@ class JobScope:
             or url.fragment
             or self.service != self.service.rstrip("/")
         ):
-            raise ValueError(
-                "Use an HTTPS or HTTP loopback API base URL without secrets or a trailing slash"
-            )
+            raise ValueError("Use an HTTPS API base URL without secrets or a trailing slash")
         _identity(self.account_id)
         for value in (self.project_id, self.team_id):
             if value is not None:
@@ -372,7 +365,7 @@ class JobIntent:
     target_id: str
     payload_sha256: str
     quote_sha256: str
-    quote_cost: str | None
+    quote_cost: str
     mesh_sources: tuple[JobMeshSource, ...] = ()
     film_task: FilmTaskBinding | None = None
 
@@ -405,8 +398,6 @@ class JobIntent:
         ):
             raise ValueError("Film task bindings require a model generation intent")
         try:
-            if self.quote_cost is None:
-                return  # External providers may offer no monetary quote; never record zero.
             if not isinstance(self.quote_cost, str) or len(self.quote_cost) > 128:
                 raise ValueError
             cost = Decimal(self.quote_cost)

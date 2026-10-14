@@ -20,6 +20,8 @@ from urllib.parse import quote, unquote, urlsplit, urlunsplit
 import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
+DOCS_REPOSITORY = "midnitefox/blender-plugin"
+DOCS_REF = "feat/provider-choice"
 SLOT = re.compile(r"{{\s*([^{}]+?)\s*}}")
 IMAGE_TYPES = {
     ".png": "image/png",
@@ -106,8 +108,7 @@ class _Page(HTMLParser):
             (
                 "https",
                 "github.com",
-                f"/scenario-labs/blender-plugin/{'tree' if target.is_dir() else 'blob'}/main"
-                + path,
+                f"/{DOCS_REPOSITORY}/{'tree' if target.is_dir() else 'blob'}/{DOCS_REF}" + path,
                 url.query,
                 url.fragment,
             )

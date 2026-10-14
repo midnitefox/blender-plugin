@@ -38,6 +38,7 @@ def test_environment_discards_credentials_and_blender_overrides(tmp_path):
         "PATH": "/usr/bin",
         "SCENARIO_TEST_API_KEY": "private",
         "SCENARIO_API_SECRET": "private",
+        "OPEN_STUDIO_TOKEN": "synthetic-local-token",
         "BLENDER_USER_SCRIPTS": "/real/scripts",
         "BLENDER_USER_RESOURCES": "/real/profile",
         "PYTHONPATH": "/source",
@@ -48,7 +49,7 @@ def test_environment_discards_credentials_and_blender_overrides(tmp_path):
     assert env["TMPDIR"] == str(tmp_path / "tmp")
     assert "PYTHONPATH" not in env
     assert "BLENDER_USER_SCRIPTS" not in env
-    assert not any(k.startswith("SCENARIO_") for k in env)
+    assert not any(k.startswith(("SCENARIO_", "OPEN_STUDIO_")) for k in env)
     assert original["BLENDER_USER_RESOURCES"] == "/real/profile"
 
 

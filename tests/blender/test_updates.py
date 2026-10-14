@@ -41,4 +41,7 @@ class UpdateTests(unittest.TestCase):
         operators = layout.box.return_value.operator.call_args_list
         self.assertTrue(operators)
         self.assertTrue(all(call.args[0] == "scenario.open_url" for call in operators))
-        self.assertEqual(updates.GUIDE_URL, "https://github.com/midnitefox/blender-plugin")
+        self.assertEqual(
+            updates.GUIDE_URL,
+            "https://github.com/midnitefox/blender-plugin/blob/feat/provider-choice/docs/USER_GUIDE.md",
+        )

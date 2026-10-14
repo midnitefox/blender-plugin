@@ -217,29 +217,19 @@ def test_blank_permissions_capture_cannot_report_success(tmp_path, monkeypatch, 
     bpy.ops.wm.quit_blender.assert_called_once()
 
 
-@pytest.mark.parametrize("failure", [None, "second_screenshot", "missing_file"])
-def test_preferences_complete_only_after_all_setup_files(tmp_path, monkeypatch, failure):
+@pytest.mark.parametrize("failure", [None, "screenshot", "missing_file"])
+def test_preferences_complete_only_after_assistant_capture(tmp_path, monkeypatch, failure):
     timers = []
-    prefs = SimpleNamespace(credential_source="PREFERENCES", provider_mode="AGENT")
-    runtime = SimpleNamespace(
-        credentials=lambda: SimpleNamespace(
-            valid=prefs.provider_mode == "SCENARIO" and prefs.credential_source == "PREFERENCES"
-        )
-    )
-    monkeypatch.setitem(sys.modules, "fixture.scenario.blender.runtime", runtime)
     bpy = Mock()
-    bpy.context.preferences.addons = {"fixture.scenario": SimpleNamespace(preferences=prefs)}
+    bpy.context.preferences.addons = {"fixture.scenario": SimpleNamespace()}
     bpy.context.temp_override.side_effect = lambda **_: nullcontext()
     bpy.app.timers.register.side_effect = lambda callback, **_: timers.append(callback)
 
     def screenshot(*, filepath):
-        path = Path(filepath)
-        if path.name == "preferences-environment.png":
-            if failure == "second_screenshot":
-                raise RuntimeError("fixture screenshot failure")
-            if failure == "missing_file":
-                return {"FINISHED"}
-        path.write_bytes(b"fixture pixels")
+        if failure == "screenshot":
+            raise RuntimeError("fixture screenshot failure")
+        if failure != "missing_file":
+            Path(filepath).write_bytes(b"fixture pixels")
         return {"FINISHED"}
 
     bpy.ops.screen.screenshot.side_effect = screenshot
@@ -248,25 +238,18 @@ def test_preferences_complete_only_after_all_setup_files(tmp_path, monkeypatch, 
     monkeypatch.setattr(
         sys,
         "argv",
-        ["blender", "--", str(tmp_path), "scenario", "sidebar", "image", "8", "form", "blender"],
+        ["blender", "--", str(tmp_path), "scenario", "sidebar", "image", "8", "empty", "blender"],
     )
     scene = runpy.run_path(str(Path(__file__).resolve().parents[2] / "tools/capture_gui_scene.py"))
     timers.clear()
     complete = Mock()
-    scene["capture_credential_preferences"](Mock(), Mock(), complete)
+    scene["capture_assistant_preferences"](Mock(), Mock(), complete)
     assert len(timers) == 1
     complete.assert_not_called()
-    timers.pop(0)()
-    assert (tmp_path / "preferences-assistant.png").is_file()
-    complete.assert_not_called()
-    timers.pop(0)()
-    assert (tmp_path / "preferences-preferences.png").is_file()
-    complete.assert_not_called()
-    assert not (tmp_path / "gui.json").exists()
     timers.pop(0)()
     if failure:
         complete.assert_not_called()
         assert json.loads((tmp_path / "gui.json").read_text())["status"] == "failed"
     else:
         complete.assert_called_once_with()
-        assert (tmp_path / "preferences-environment.png").is_file()
+        assert (tmp_path / "preferences-assistant.png").is_file()

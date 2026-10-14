@@ -36,7 +36,7 @@ from ..core.scene import panorama_contract
 from ..core.scene.panorama import describe_world_media
 from ..core.schema.params import build_body, validate
 from ..core.ui import capability_status
-from ..core.ui.costs import quote_cost_fields, workflow_quote_notice
+from ..core.ui.costs import workflow_quote_notice
 from .protocol import DeferredTool, ToolSpec
 
 
@@ -205,7 +205,7 @@ def list_models(args):
             "capabilities": list(rec.capabilities),
             "capability_status": capability_status.model_status(rec.capabilities),
         }
-        contract = panorama_contract.contract_for(rec.id, rec) if lane == "panorama" else None
+        contract = panorama_contract.contract_for(rec.id) if lane == "panorama" else None
         if contract is not None:
             entry["contract"] = panorama_contract.summary(contract)
         out.append(entry)
@@ -326,7 +326,7 @@ def model_schema(args):
 def _body_for(model_id, parameters, *, lane="image"):
     contract = None
     if lane == "panorama":
-        contract = panorama_contract.contract_for(model_id, _described(model_id))
+        contract = panorama_contract.contract_for(model_id)
         if contract is None:
             raise ValueError("Use a verified panorama model from list_models(lane=panorama)")
     record = _described(model_id)
@@ -479,7 +479,8 @@ def estimate_cost(args):
             "model_id": record.id,
             "lane": lane,
             "quote_id": ticket.identifier,
-            **quote_cost_fields(quote),
+            "cu_cost": float(quote.cost),
+            "cu_cost_exact": str(quote.cost),
             "mesh_sources": [asdict(source) for source in ticket.quote.mesh_sources],
             "details": json.loads(quote.response_json).get("costDetails") or {},
         }
@@ -796,7 +797,7 @@ def estimate_workflow(args):
             "quote_id": ticket.identifier,
             "parameters": json.loads(ticket.inputs),
             "payload": estimate.payload,
-            **quote_cost_fields(estimate),
+            "cu_cost_exact": str(estimate.cost),
             "mesh_sources": [asdict(source) for source in ticket.quote.mesh_sources],
             **workflow_quote_notice(estimate.loop_steps),
         }
@@ -1402,7 +1403,7 @@ def estimate_prompt(args):
             "quote_id": item.identifier,
             "action": item.action,
             "lane": item.lane,
-            **quote_cost_fields(item.quote.estimate),
+            "cu_cost_exact": item.cost,
         }
 
     return DeferredTool(item.task.result, finish)
@@ -1452,11 +1453,7 @@ def estimate_blockout(args):
         jobs.poll()
         if item.phase != "READY":
             raise ScenarioError(0, item.error or "The Blockout price is unavailable")
-        return {
-            "quote_id": item.identifier,
-            "action": item.action,
-            **quote_cost_fields(item.quote.estimate),
-        }
+        return {"quote_id": item.identifier, "action": item.action, "cu_cost_exact": item.cost}
 
     return DeferredTool(item.task.result, finish)
 
@@ -3840,12 +3837,12 @@ SPECS = (
     ToolSpec(
         "estimate_cost",
         (
-            "Prepare a generation quote without submitting. Scenario returns its exact CU estimate; other providers may have no quote API.\n"
+            "Get the exact CU cost with a dry run that spends no credits.\n"
             "Args:\n"
             "  - model_id: required string, the model identifier.\n"
             "  - parameters: optional object, model parameters including Scenario asset ids for file inputs. LoRAs or a composition go in the base model's lora_component inputs from model_schema, one strength per LoRA; they are checked against the listed trained models and rebuilt as the native form builds them, refusing before any request what the form would refuse. Omit for render lanes: prepare render_form first; pricing uses its native scene prompt, uploaded snapshots and trained choice.\n"
             "  - lane: optional generation lane, default image. Every lane issues a single-use quote_id. Lane panorama accepts only list_models(lane=panorama) models and applies their contract: locked values (a different value is refused), lane defaults when unset, 2:1 sizes and reference rules. A panorama-kind reference must be the asset_id of a saved, downloaded 360 result of this account and project (job_status projection equirectangular, source asset); other asset IDs are refused. Upscale factors are capped for the 32-megapixel World limit: at most 2 for a reference of unknown size, which fits a 2:1 panorama up to 4096 pixels wide, and an upscaled result is not upscaled again. A changed model schema fails closed.\n"
-            "Returns: model_id, lane, cu_cost, cu_cost_exact (decimal string or null), approved_cost, provider_billed, cost_label, details, mesh_sources (local captured 3D input provenance) and quote_id bound to the lane, model, inputs, scene and credential context. When provider_billed is true, no price is known: show cost_label and obtain approval to use provider billing before passing approved_cost='provider-billed'. Never treat a null price as free or zero.\n"
+            "Returns: model_id, lane, cu_cost, cu_cost_exact (decimal string), details, mesh_sources (local captured 3D input provenance) and quote_id bound to the lane, model, inputs, scene and credential context.\n"
             'Example: {"model_id": "model_example", "parameters": {"prompt": "a wooden crate"}}.\n'
             "Call before generate and show the cost to the user; an estimate does not authorize spending. Like model_schema, a first call for a model whose description is not loaded yet waits up to 30 seconds for it. Speech-to-text (audio2txt) and video-to-motion (video23d) models are experimental: they can be estimated and generated and their results stay in saved jobs, but motion and transcription handling is not accepted. prepare_result_application imports a returned model or media file by file type only.\n"
             "Platform equivalent: model_run with dry_run."
@@ -3864,13 +3861,13 @@ SPECS = (
     ToolSpec(
         "generate",
         (
-            "Submit a generation using the selected provider's billing or compute. Every model lane uses durable shared jobs.\n"
+            "Submit a generation that spends the user's credits. Every model lane uses durable shared jobs.\n"
             "Args:\n"
             "  - lane: required string; image, video, 3d, material, audio, render_image, render_video, edit3d or panorama.\n"
             "  - model_id: required string, the exact model to run.\n"
             "  - parameters: optional object, model parameters; file inputs take Scenario asset ids and LoRA inputs follow estimate_cost. Omit for render lanes, which rebuild the current render_form before checking the approved quote.\n"
             "  - quote_id: required, from estimate_cost with the same lane, model, inputs and scene.\n"
-            "  - approved_cost: required, the quote's approved_cost string explicitly approved by the user. For a known price it is the exact cu_cost_exact string; an unknown price requires explicit 'provider-billed' approval after showing cost_label.\n"
+            "  - approved_cost: required, the exact cu_cost_exact string explicitly approved by the user.\n"
             "Returns: local_id, status, lane, model_id and note. All model jobs poll and download through the shared session. Only the Image lane imports verified PNG/EXR images automatically into the unchanged origin. Other lanes stop at saved ready results; their scene application remains separate. Panorama results never change a World automatically; use prepare_result_application(purpose=world). Render lanes require explicit render_form uploads and separate Prompt Spark approval when enabled with an empty look. No capture, upload or Spark submission occurs during generate.\n"
             'Example: {"lane": "image", "model_id": "model_example", "parameters": {"prompt": "a wooden crate"}, "quote_id": "quote_from_estimate", "approved_cost": "1.25"}.\n'
             "Do not call before estimate_cost and explicit spending approval. Do not repeat a timed-out submission. Use prepare_result_application for saved-result imports. Speech-to-text (audio2txt) and video-to-motion (video23d) models are experimental: their results stay in saved jobs, but motion and transcription handling is not accepted. prepare_result_application imports a returned model or media file by file type only.\n"

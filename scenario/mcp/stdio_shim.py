@@ -13,7 +13,6 @@ import argparse
 import ipaddress
 import json
 import pathlib
-import re
 import sys
 import urllib.error
 import urllib.parse
@@ -46,7 +45,7 @@ def read_connection_file(path):
         url, token = config["url"], config["token"]
         if not isinstance(url, str) or not isinstance(token, str):
             raise ValueError
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", token):
+        if not 1 <= len(token) <= 256 or any(not 33 <= ord(c) <= 126 for c in token):
             raise ValueError
         parsed = urllib.parse.urlsplit(url)
         host = parsed.hostname
@@ -68,7 +67,7 @@ def read_connection_file(path):
         return url, token
     except (OSError, ValueError, TypeError, UnicodeError):
         raise ValueError(
-            "Blender connection unavailable. Start Blender and its Agents server, then retry."
+            "Blender connection unavailable. Start Blender and its assistant connection, then retry."
         ) from None
 
 
@@ -108,7 +107,7 @@ def forward(url, token, message, timeout=300):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="scenario-blender-stdio")
+    parser = argparse.ArgumentParser(prog="open-studio-stdio")
     parser.add_argument("--url", default="http://127.0.0.1:9876/mcp")
     auth = parser.add_mutually_exclusive_group(required=True)
     auth.add_argument("--token")

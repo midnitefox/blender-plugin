@@ -29,14 +29,12 @@ def register():
     import bpy
 
     check_registration_conflicts(bpy.context.preferences.addons.keys(), __package__)
-    from .blender import job_session, registry
+    from .blender import registry
 
     registry.register()
-    job_session.register()
 
 
 def unregister():
-    from .blender import job_session, registry
+    from .blender import registry
 
-    job_session.unregister()
     registry.unregister()

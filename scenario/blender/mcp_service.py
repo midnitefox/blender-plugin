@@ -24,10 +24,10 @@ SERVER_INFO = {"name": "open-studio", "version": __version__}
 
 
 def build_registry():
-    from ..mcp import tools_agent, tools_blender, tools_scenario
+    from ..mcp import tools_agent, tools_blender
 
     registry = protocol.Registry()
-    for spec in (*tools_agent.SPECS, *tools_blender.SPECS, *tools_scenario.SPECS):
+    for spec in (*tools_agent.SPECS, *tools_blender.SPECS):
         registry.add(spec)
     return registry
 
@@ -84,7 +84,6 @@ def stop():
 
 
 def process_pending():
-    runtime.sync_catalog_context()
     server = runtime.state.mcp
     if server is not None:
         server.process_pending()
@@ -165,37 +164,28 @@ def client_configs():
             }
         }
     }
+    command = " ".join(
+        _shell_argument(arg)
+        for arg in (
+            _blender_python(),
+            shim_path(),
+            "--connection-file",
+            str(connection_file_path()),
+        )
+    )
     return {
-        "claude_code": f'claude mcp add --transport http open-studio {url} --header "Authorization: Bearer {token}"',
-        "cursor": json.dumps(
-            {
-                "mcpServers": {
-                    "open-studio": {
-                        "url": url,
-                        "headers": {"Authorization": f"Bearer {token}"},
-                    }
-                }
-            },
-            indent=2,
-        ),
+        "claude_code": "claude mcp add --transport stdio open-studio -- " + command,
+        "cursor": json.dumps(stdio, indent=2),
         "claude_desktop": json.dumps(stdio, indent=2),
         "codex": "codex mcp add open-studio -- "
-        + " ".join(
-            _shell_argument(arg)
-            for arg in (
-                _blender_python(),
-                shim_path(),
-                "--connection-file",
-                str(connection_file_path()),
-            )
-        )
-        + "\n# Keep Blender open with the Agents server running. Reconnect MCP in Codex after setup.",
+        + command
+        + "\n# Keep Blender open with the assistant connection running. Reconnect MCP in Codex after setup.",
         "curl": f'curl -s -X POST {url} -H "Authorization: Bearer {token}" -H "Content-Type: application/json" -d \'{{"jsonrpc":"2.0","id":1,"method":"tools/list"}}\'',
     }
 
 
 def cli(argv):
-    """blender --background file.blend --command scenario_blender [--port N] [--token T]"""
+    """blender --background file.blend --command open_studio [--port N] [--token T]"""
     import argparse
     import signal
     import threading
@@ -205,7 +195,7 @@ def cli(argv):
     parser.add_argument(
         "--token",
         default=None,
-        help="Local MCP token; otherwise SCENARIO_BLENDER_TOKEN or a new token",
+        help="Local MCP token; otherwise OPEN_STUDIO_TOKEN or a private generated token",
     )
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
@@ -236,7 +226,7 @@ def cli(argv):
         except OSError as error:
             parser.error(f"Unable to start local MCP: {error}")
         print(cli_banner(server.url, token, generated), flush=True)
-        server.serve_blocking(stop_event, before_process=runtime.sync_catalog_context)
+        server.serve_blocking(stop_event)
     except KeyboardInterrupt:
         stop_event.set()
     finally:

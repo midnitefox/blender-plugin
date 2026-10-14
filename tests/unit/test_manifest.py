@@ -193,10 +193,9 @@ def test_network_permission_matches_code():
     assert declared == bool(uses), f"Network imports: {uses}; declared={declared}"
 
 
-def test_network_permission_discloses_the_api_and_the_local_listener():
-    # Local MCP starts by default in GUI sessions with Online Access on (#448).
-    # Exact text: it names the API host and the loopback listener within Blender's limit.
-    assert permissions()["network"] == ("Chosen AI services and local agents on 127.0.0.1")
+def test_network_permission_discloses_the_local_assistant_listener():
+    # Local MCP starts in GUI sessions with Online Access on; generation is external.
+    assert permissions()["network"] == "Connect local assistants on 127.0.0.1"
 
 
 def test_permission_reasons_follow_manifest_rules():

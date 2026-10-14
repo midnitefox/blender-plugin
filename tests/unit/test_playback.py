@@ -376,6 +376,7 @@ def test_players_get_no_credentials_python_start_up_or_proxies():
         "HOME": "/home/fixture",
         "BLENDER_USER_RESOURCES": "/profile",
         "SCENARIO_API_KEY": "secret",
+        "OPEN_STUDIO_TOKEN": "assistant-fixture",
         "scenario_api_secret": "secret",
         "PYTHONPATH": "/inject",
         "PYTHONSTARTUP": "/inject.py",

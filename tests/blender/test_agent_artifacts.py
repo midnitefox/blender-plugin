@@ -17,15 +17,12 @@ class AgentArtifactTests(unittest.TestCase):
         reset_scene()
         self.tools = submodule("mcp.tools_agent")
         self.prefs = submodule("prefs").get_prefs()
-        self.previous_mode = self.prefs.provider_mode
-        self.prefs.provider_mode = "AGENT"
         self.inbox = Path(self.tools.agent_workspace({})["inbox"])
         self.source = self.inbox / "agent-native-test.png"
         shutil.copyfile(FIXTURES / "patina-copper-512" / "albedo.png", self.source)
 
     def tearDown(self):
         self.source.unlink(missing_ok=True)
-        self.prefs.provider_mode = self.previous_mode
 
     def test_reference_is_packed_and_repeat_reuses_it(self):
         digest = hashlib.sha256(self.source.read_bytes()).hexdigest()
@@ -95,4 +92,4 @@ class AgentArtifactTests(unittest.TestCase):
         self.assertIn("agent_workspace", registry.names())
         self.assertIn("import_agent_image", registry.names())
         self.assertFalse(self.tools.agent_workspace({})["generation_provider_required"])
-        self.assertFalse(submodule("blender.runtime").credentials().valid)
+        self.assertFalse(hasattr(self.prefs, "api_key"))

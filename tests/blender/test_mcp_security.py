@@ -123,8 +123,8 @@ class McpSecurityTests(unittest.TestCase):
             prefs.mcp_allow_python = False
             self.assertEqual(
                 call("execute_python", {"code": "result['value'] = 1"}),
-                "PermissionError: Python execution is disabled in Scenario preferences "
-                "(MCP > Allow connected agents to run Python)",
+                "PermissionError: Python execution is disabled in Open Studio preferences "
+                "(Local assistant connection > Allow connected assistants to run Python)",
             )
         finally:
             prefs.mcp_allow_python = original

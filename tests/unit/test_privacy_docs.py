@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Disclosure drift checks; native tests establish actual preference persistence."""
+"""Disclosures for the registered local assistant workflow and its handbook."""
 
 import ast
 import re
@@ -10,63 +10,78 @@ from urllib.parse import urlsplit
 from tools.build_docs_html import build_handbook
 
 ROOT = Path(__file__).resolve().parents[2]
+# Dormant upstream service modules do not describe the registered local workflow.
+ACTIVE_SOURCES = (
+    "scenario/prefs.py",
+    "scenario/blender/registry.py",
+    "scenario/blender/runtime.py",
+    "scenario/blender/assistant_loop.py",
+    "scenario/blender/assistant_ui.py",
+    "scenario/blender/provider_setup.py",
+    "scenario/blender/mcp_service.py",
+    "scenario/blender/updates.py",
+    "scenario/mcp/tools_agent.py",
+    "scenario/mcp/tools_blender.py",
+    "scenario/mcp/server.py",
+    "scenario/mcp/stdio_shim.py",
+)
 
 
-def test_literal_network_destinations_require_a_disclosure_review():
+def test_active_literal_network_destinations_require_a_disclosure_review():
     hosts = set()
-    for path in (ROOT / "scenario").rglob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+    for relative in ACTIVE_SOURCES:
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(source)):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 for url in re.findall(r"https?://[A-Za-z0-9.:-]+", node.value):
                     hosts.add(urlsplit(url).hostname)
-    assert hosts <= {
-        "api.cloud.scenario.com",
-        "app.scenario.com",
-        "127.0.0.1",
-        "blender.scenario.com",
-        "github.com",
-    }, hosts
-    note = (ROOT / "docs/PRIVACY.md").read_text()
+    assert hosts <= {"127.0.0.1", "github.com"}, hosts
+    note = (ROOT / "docs/PRIVACY.md").read_text(encoding="utf-8")
     assert all(host in note for host in hosts)
-    # Dynamic content destinations cannot be established by literal-source scanning.
-    assert "content URLs returned by the" in note
+    # Assistant data processing and arbitrary Python cannot be inferred from URLs.
+    assert "own service" in note
+    assert "Code can access files or the network" in note
 
 
-def test_privacy_entry_points_and_critical_storage_disclosures():
-    note = (ROOT / "docs/PRIVACY.md").read_text()
-    assert re.findall(r"^## (.*)$", note, re.M) == [
-        "What leaves your machine, and when",
-        "Where it goes",
-        "What is stored on your machine",
-        "The local MCP server",
-        "Terms",
-    ]
+def test_privacy_entry_points_and_critical_local_storage_disclosures():
+    note = (ROOT / "docs/PRIVACY.md").read_text(encoding="utf-8")
     for text in (
-        "userpref.blend",
-        "SCENARIO_API_KEY",
-        "SCENARIO_API_SECRET",
-        "jobs.json",
-        "telemetry",
-        "terms-and-conditions",
-        "privacy-policy",
-        "before you press",
-        "Clipboard",
-        "not an instantaneous network cutoff",
+        "scene summaries",
+        "current file path",
+        "Viewport and",
+        "makes no external",
+        "agent-connection.json",
+        "bearer token",
+        "127.0.0.1",
+        "inbox persists",
+        "saved `.blend` file",
+        "Allow connected assistants to run Python",
+        "off by default",
+        "not a security sandbox",
     ):
         assert text in note, text
-    assert "Pro plan" not in note
-    assert not re.search(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}| CU\b", note)
+    for obsolete in (
+        "SCENARIO_API_KEY",
+        "SCENARIO_API_SECRET",
+        "userpref.blend",
+        "before you press",
+    ):
+        assert obsolete not in note
     for path, link in (("README.md", "docs/PRIVACY.md"), ("docs/USER_GUIDE.md", "PRIVACY.md")):
-        text = (ROOT / path).read_text()
+        text = (ROOT / path).read_text(encoding="utf-8")
         assert text.count(link) == 1
-        assert text.count("## What leaves your machine") == 1
         assert "removed when the extension is uninstalled" not in text
-    prefs = (ROOT / "scenario/prefs.py").read_text()
-    assert "Saved as plain text in userpref.blend" in prefs
-    assert "Select Environment to use SCENARIO_API_KEY + SCENARIO_API_SECRET" in prefs
+    prefs = ast.parse((ROOT / "scenario/prefs.py").read_text(encoding="utf-8"))
+    properties = {
+        node.target.id
+        for node in ast.walk(prefs)
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    assert "mcp_allow_python" in properties
+    assert not properties & {"api_key", "api_secret", "provider_mode", "provider_profiles"}
 
 
-def test_standalone_guide_preserves_disclosures(tmp_path):
+def test_standalone_guide_preserves_assistant_disclosures(tmp_path):
     output = build_handbook(
         ROOT / "docs/USER_GUIDE.md",
         ROOT / "docs/handbook-template.html",
@@ -74,8 +89,16 @@ def test_standalone_guide_preserves_disclosures(tmp_path):
         tmp_path / "handbook.html",
         inline_images=True,
     )
-    text = output.read_text()
-    assert "What leaves your machine" in text
+    text = output.read_text(encoding="utf-8")
+    assert "<title>Open Studio for Blender: user guide</title>" in text
+    assert 'href="https://github.com/scenario-labs/blender-plugin/' not in text
+    assert (
+        'href="https://github.com/midnitefox/blender-plugin/blob/feat/provider-choice/docs/PRIVACY.md"'
+        in text
+    )
+    assert "Privacy" in text
     assert "PRIVACY.md" in text
-    assert "userpref.blend" in text
+    assert "requested scene data and viewport captures" in text
+    assert "Local image import makes no" in text
+    assert "private connection file" in text
     assert "removed with the extension" not in text

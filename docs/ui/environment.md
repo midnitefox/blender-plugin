@@ -80,7 +80,7 @@ discards the prepared handle.
 After completed application, **Restore previous World** uses a separate prepared
 approval. It names the current scene/World and explains that edited owned data
 prevents restoration. Do not silently clear edits, reapply the job or reset its
-completed state after restoration. Reference [the user guide](../USER_GUIDE.md#apply-a-saved-panorama-to-world)
+completed state after restoration. Reference [the user guide](../USER_GUIDE.md#historical-upstream-reference)
 for screenshots and [the World guide](../WORLD_APPLICATION.md#saved-result-ui-and-mcp-approval)
 for reuse and file-load restoration boundaries.
 

@@ -18,9 +18,9 @@ to every coding agent.
 | --- | --- |
 | Python, core, protocol, tests | [Python style](docs/PYTHON_STYLE.md), [validation](docs/development/validation.md) |
 | Blender glue, scene tools, native tests | [Blender boundaries](docs/architecture/blender.md), [validation](docs/development/validation.md) |
-| UI or composer | [UI style](docs/UI_STYLE.md), including native interaction proof |
-| SDK adapter or dependency pin | [SDK contracts](docs/SDK_ADOPTION.md), [SDK bundle](docs/SDK_BUNDLE.md) |
-| Jobs, transfers or application | [Runtime map](docs/architecture/runtime.md) and its relevant component guide |
+| Assistant UI | [UI style](docs/UI_STYLE.md), including native interaction proof |
+| Retained service adapter or dependency pin | [SDK contracts](docs/SDK_ADOPTION.md), [SDK bundle](docs/SDK_BUNDLE.md) |
+| MCP, image handoff or scene application | [Runtime map](docs/architecture/runtime.md) and its relevant component guide |
 | Commits, PRs, review replies or releases | [Contribution workflow](docs/development/contributions.md), [release procedure](docs/RELEASING.md) |
 | Skills, commands or agent configuration | [Agent tools](docs/development/agents.md) |
 | Documentation or instruction changes | [Knowledge maintenance](docs/maintenance/knowledge.md) |
@@ -32,95 +32,64 @@ for the current checkout and `docs/UI_STYLE.md` before changing UI behavior.
 Older design documents and session notes describe the prototype; they do not
 override the user's instructions or the current issue and PR scope.
 
-The approved direction is one consolidated extension, a compact default UI,
-optional expanded Studio and Blender-native updates. The current release uses
-explicit API key/secret configuration; browser OAuth is deferred under #67. There is no
-prototype-data migration requirement. Preserve useful capabilities and tests,
-source attribution and required third-party notices when adopting code.
+The approved direction is an assistant-only extension with a compact local UI.
+An external assistant such as Codex connects through authenticated local MCP,
+creates assets with its own tools and hands image files to Blender through a
+bounded local inbox. The active extension offers scene inspection and editing,
+camera paths, captures, image references and base-color texture application.
+Python execution is a separate explicit opt-in.
+
+The active registration has no direct generation provider, service credential
+fields, cloud job session or Scenario SDK imports. Preserve this boundary when
+maintaining retained upstream source. Full parity with the upstream generation,
+material, 3D, film and environment workflows remains unfinished; describe only
+implemented and verified behavior. There is no prototype-data migration
+requirement. Preserve source attribution and required third-party notices.
 
 The current package is `scenario/`; the approved minimum is Blender 5.0.
 Adoption must validate native behavior and bundled dependencies on Blender 5.0,
 5.1 and 5.2. A manifest declaration or successful ZIP validation does not prove
 runtime compatibility.
 
-## Scenario SDK first: mandatory
+## Retained service source and packaging
 
-Use the official Python SDK (`scenario-sdk`) for Scenario service operations in
-the UI, jobs, local MCP and supporting tools. Its source and issue tracker are
-`scenario-labs/scenario-sdk-python`.
+Upstream Scenario service adapters, cloud jobs and their tests remain as retained
+source. Their contracts apply only when explicitly maintaining those paths.
+They do not authorize restoring service setup or generation to the active
+assistant runtime. The user's current scope takes precedence over historical
+plans and service guides.
 
-1. Inspect the exact selected SDK release, its public methods, supported extension
-   parameters, response wrappers and configuration before implementing an operation.
-   Do not assume the repository's main branch matches the published artifact.
-   Start with the [Python SDK documentation](https://docs.scenario.com/api/python).
-   When its coverage is insufficient, consult the
-   [Scenario API reference](https://docs.scenario.com/api) for the operation's
-   actual endpoint, authentication, parameters and response contract. A missing
-   generated SDK method is not evidence that the API cannot perform an operation.
-2. Use the SDK through one shared integration adapter. Existing prototype HTTP
-   code, convenience or an unfamiliar SDK method is not a reason to bypass it.
-   Audit and replace imported API paths during adoption.
-3. If the SDK cannot perform a required operation correctly, reproduce the gap.
-   Find an existing SDK issue or create one with the SDK version, expected/actual
-   behavior and a sanitized reproduction. Keep private evidence out of public text.
-4. Only then add a narrow raw API fallback for that operation inside the shared
-   adapter. Link the SDK issue in the code and PR, test the fallback, and record
-   the condition for removing it. Recheck exceptions on SDK upgrades.
-   Follow the [named SDK extension workflow](docs/SDK_ADOPTION.md#sdk-resource-extensions):
-   add a method to the adapter-owned extension layer, reuse its configured SDK
-   client and transport, and preserve credential isolation, permission checks,
-   sanitized errors and retry policy. Do not wait for SDK regeneration when a
-   verified API contract and tracked SDK gap allow this path; do not invent an
-   endpoint when neither documentation nor inspected first-party code establishes it.
-5. Custom endpoint calls through low-level SDK HTTP verbs are fallbacks too.
-   A documented endpoint's `with_raw_response` wrapper is still SDK usage.
-   Browser authorization, signed storage transfers and update repositories are
-   distinct protocols: document their actual SDK coverage, not a blanket HTTP ban.
-6. Pin and package the SDK and its required dependencies, including wheels when
-   needed. Validate the exact bundle with Blender's Python and supported OS/CPU
-   combinations; preserve dependency licenses. The SDK supersedes the old blanket
-   stdlib-only/no-wheels rule, without authorizing unrelated dependencies.
-7. Configure retries explicitly. Use `max_retries=0` for paid submissions unless
-   a verified server idempotency contract makes retry safe. A timeout is an
-   uncertain submission, not permission to submit again.
+For an authorized change to a retained Scenario adapter or dependency pin, read
+the SDK guides above and inspect the exact selected release's public contract.
+Preserve the shared adapter boundary, documented SDK exceptions, credential
+isolation and explicit retry policy. Extend the offline contracts as needed and
+run `uv run --locked --no-env-file python -m pytest tests/unit/test_scenario_sdk_contract.py -rx`.
+An expected failure records an unresolved gap and cannot establish acceptance.
 
-API-key requests use the server's credential-bound scope; team/project discovery
-and explicit selection are optional, not prerequisites for generation. Keep local
-jobs and quotes isolated by selected credentials and any project override. Do not
-infer a key's default project or server account identity from the first discovery
-result. OAuth tenant selection is a separate contract.
+Preserve the selected bundle's dependency pins, licenses and validation while
+those dependencies remain packaged. Validate dependency changes with Blender's
+Python and the supported OS/CPU combinations. Bundled service dependencies are
+not a prerequisite for assistant setup and must remain outside active imports.
 
-Before changing the shared SDK adapter or its dependency pin, read
-`docs/SDK_ADOPTION.md` and run
-`uv run --locked python -m pytest tests/unit/test_scenario_sdk_contract.py -rx`.
-The known authentication expected failure is an unresolved gap, not production
-acceptance. Extend these offline contracts when mapping adopted operations.
-
-Changes to Scenario API calls must identify the SDK method or the documented
-exception in the PR. Documentation-only work does not need an API coverage audit.
-The SDK is an adoption requirement; its presence in these instructions does not
-mean the current prototype client has already been replaced.
-
-## Blender, jobs and authentication
+## Blender, local MCP and image handoff
 
 - Keep bpy operations on Blender's main thread, never under `scenario/core/`.
-  Workers perform network work and queue results; the GUI pump applies them.
-  Headless operation needs its own blocking queue processing.
+  MCP request workers queue operations; the GUI pump applies them.
+  Headless operation needs its own blocking queue processing. Stop listeners,
+  timers and queued work cleanly during extension disable and re-enable.
 - Never mutate properties during `draw()`. Follow `docs/UI_STYLE.md` and verify
-  native input, focus and viewport interaction when changing the composer.
-- Keep job lifetime independent of an open UI. Persist request identity and scope
-  before spending; recover uncertain jobs without blind resubmission.
-- Bind quotes and callbacks to the exact payload, account, project, scene and
-  target. Closing a view or switching context must not misroute a late result.
-- Preserve the exact server estimate before a paid action. REST `dryRun` belongs
-  in the query, not the JSON body; use the selected SDK's documented parameter.
+  native input, focus and viewport interaction when changing the assistant UI.
+- Bind queued operations to the intended current scene and target. Cancel stale
+  work on file changes; a late operation must not affect a newly opened file.
 - Respect `bpy.app.online_access` before network activity. Store state under
   `bpy.utils.extension_path_user`, never inside the installed extension.
-- Keep local MCP authenticated, Python execution opt-in and disabled by default.
-  Use private temporary directories and guaranteed cleanup for captures.
-- Explicitly configure SDK credentials. Test that ambient API-key environment
-  variables cannot override the selected OAuth account. Never distribute a
-  privileged server secret or assume an OAuth token is accepted by REST.
+- Keep local MCP authenticated and loopback-only. Keep Python execution opt-in
+  and disabled by default. Use private temporary directories and guaranteed
+  cleanup for captures; remove session connection files when stopping the server.
+- Accept image handoffs only through the bounded inbox contract. Validate file
+  identity, size, format and digest before application. Pack the verified bytes
+  into the blend file, preserve unrelated objects and materials, and verify
+  repeat imports and save/reopen behavior. Mark actual scene changes as modified.
 - Never print or commit credentials, tokens or signed URL query strings.
   `.env.local` and local agent notes are private. Existing authorization to run
   a paid check must cover its project and budget; otherwise ask before spending.
@@ -143,7 +112,7 @@ records, workspace identifiers, spend anecdotes or private research exports.
 Preserve GPL text and first-party SPDX notices; preserve the original licenses
 and attribution of third-party code, fonts, icons and SDK dependencies.
 
-Useful prototype lessons to retain while changing implementations:
+When maintaining retained upstream workflows, preserve these contracts:
 
 - Long text asset previews can be truncated; check `hasFullPreview` and fetch
   the full asset rather than parsing an incomplete plan.

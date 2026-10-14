@@ -110,7 +110,7 @@ def isolated_environment(profile, temporary, environ=None):
     env = {
         key: value
         for key, value in original.items()
-        if not key.startswith(("SCENARIO_", "BLENDER_", "PYTHON"))
+        if not key.startswith(("SCENARIO_", "OPEN_STUDIO_", "BLENDER_", "PYTHON"))
     }
     env["BLENDER_USER_RESOURCES"] = str(Path(profile).resolve())
     env["PYTHONNOUSERSITE"] = "1"

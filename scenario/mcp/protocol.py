@@ -22,20 +22,18 @@ PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR, 
     -32000,
 )
 INSTRUCTIONS = (
-    "Blender is open on the user's machine. Start with scene_summary, prefer the specific tools over execute_python, "
-    "For image creation, use your assistant's own image generation (such as Codex ImageGen) when available. "
-    "Call agent_workspace, save or copy the generated image into its inbox, then import_agent_image as "
-    "a REFERENCE, TEXTURE or IMAGE. That local handoff requires no Scenario account or ComfyUI. "
-    "Do not assume a generated image is a 3D mesh or a complete PBR material. "
-    "quote the CU cost (estimate_cost) before generating, and place results where the user is working. "
-    "Use list_assets or search_assets for scoped library metadata and reusable asset IDs; these do not download or apply assets. "
-    "Use estimate_workflow then run_workflow for an explicitly approved workflow in this local scope. "
-    "To add library assets to or remove them from collections, change their tags or create a collection, "
-    "call prepare_asset_organization, show the review and call apply_asset_organization only after explicit approval; "
-    "never repeat an unconfirmed change. "
-    "Decide waiting workflow steps (workflow_job_steps, decide_workflow_step) only with the user's explicit choice. "
-    "For other platform-wide work (collection rename or deletion, training, workflow authoring, usage) "
-    "use the mcp.scenario.com server when it is connected."
+    "Blender is open on the user's machine. Start with scene_summary and inspect the exact target "
+    "with object_detail before changing it. Prefer the specific local tools over execute_python. "
+    "For image creation, use your assistant's own image-generation tool when available. "
+    "Call agent_workspace, save or copy the generated image into its inbox, then import_agent_image "
+    "with its basename as a REFERENCE, TEXTURE or IMAGE. TEXTURE requires a named editable mesh "
+    "with UV coordinates and applies a new base-color material to its active slot. Save the blend "
+    "file to retain packed images. A generated image supplies pixels; automated mesh generation, "
+    "full PBR maps, rigging, motion, audio and video workflows are not exposed by this build. "
+    "Viewport and OpenGL captures require Blender's GUI. Use blender_api_help before scripting. "
+    "execute_python is disabled unless the user has explicitly enabled the Python preference; "
+    "it runs with Blender's user permissions and is not a security sandbox. "
+    "This extension cannot invoke the assistant's own generation tool itself."
 )
 
 

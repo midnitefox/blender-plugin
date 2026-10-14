@@ -11,7 +11,6 @@ import bpy
 
 from ..core.api.errors import ScenarioError
 from ..core.scene.film_plan import require_plan_scope, validate_film_plan
-from ..core.ui.costs import quote_cost_fields
 
 
 def recipe(scene):
@@ -234,7 +233,7 @@ class FilmJobs:
                 item.completion = None
                 if item.phase == "QUOTING":
                     item.quote = result
-                    item.cost, item.phase = result.estimate.approval_amount, "READY"
+                    item.cost, item.phase = str(result.estimate.cost), "READY"
                 else:
                     item.request_id = result.reference.upload_request_id
                     item.phase = "BOUND"
@@ -266,7 +265,7 @@ class FilmJobs:
             "task_id": item.task_id,
             "model_id": item.quote.estimate.target_id,
             "parameters": item.quote.estimate.payload,
-            **quote_cost_fields(item.quote.estimate),
+            "cu_cost_exact": item.cost,
         }
 
     def approve(self, identifier, scene, *, approved_cost):

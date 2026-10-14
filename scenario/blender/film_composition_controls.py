@@ -7,7 +7,7 @@ import textwrap
 import bpy
 from bpy.props import StringProperty
 
-from ..core.ui.costs import format_approved_cost
+from ..core.ui.costs import format_cu
 from . import runtime
 from .film_scene_controls import _error
 
@@ -72,7 +72,7 @@ class SCENARIO_OT_generate_film_composition(bpy.types.Operator):
             self._status = self._owner.status(self.review_id)
             if self._status["phase"] != "QUOTED":
                 raise ValueError("Request a fresh price")
-            self._cost = self._status["approved_cost"]
+            self._cost = self._status["cu_cost_exact"]
         except Exception:
             return _error(self, "Request a current composition price first")
         return context.window_manager.invoke_props_dialog(self, width=540)
@@ -82,7 +82,7 @@ class SCENARIO_OT_generate_film_composition(bpy.types.Operator):
         self.layout.label(text=f"{status['scene']}: {status['mode'].title()} master")
         self.layout.label(text=f"{status['frames']} frames at {status['fps']} fps")
         self.layout.label(text=f"{status['sources']} verified sources; {status['layers']} layers")
-        self.layout.label(text=f"Cost: {format_approved_cost(self._cost)}")
+        self.layout.label(text=f"Exact price: {self._cost} CU")
         self.layout.label(text="Saves one master job. The recipe and Blender scene stay unchanged.")
         self.layout.label(
             text="Inspect saved jobs after submission; never repeat an uncertain attempt."
@@ -160,7 +160,7 @@ class SCENARIO_PT_film_composition(bpy.types.Panel):
     bl_parent_id = "SCENARIO_PT_film"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Open Studio"
+    bl_category = "Scenario"
 
     @classmethod
     def poll(cls, context):
@@ -194,7 +194,7 @@ class SCENARIO_PT_film_composition(bpy.types.Panel):
             row.scale_y = 1.5
             row.operator(
                 "scenario.generate_film_composition",
-                text=f"Generate ({format_approved_cost(status['approved_cost'])})",
+                text=f"Generate ({format_cu(status['cu_cost_exact'])} CU)",
                 icon="PLAY",
             ).review_id = identifier
         elif phase in {"PREPARING", "QUOTING", "WAITING", "CANCELLING"}:

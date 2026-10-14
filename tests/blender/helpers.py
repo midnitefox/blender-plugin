@@ -28,13 +28,6 @@ _INSTALLED = None
 def configure(package, installed, profile):
     global _PACKAGE, _INSTALLED
     _PACKAGE, _INSTALLED = package, installed
-    prefs = bpy.context.preferences.addons[package].preferences
-    # The legacy service contracts explicitly exercise Scenario. Production
-    # defaults to external-assistant mode; provider setup tests check that RNA default.
-    prefs.provider_mode = "SCENARIO"
-    prefs.active_provider_index = -1
-    prefs.output_dir = str(profile / "output")
-    prefs.api_key = prefs.api_secret = ""
 
 
 def addon_name():

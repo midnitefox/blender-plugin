@@ -129,27 +129,3 @@ def open_credential_store(root, credentials, *, service=API_URL, project_id=None
         raise StoreError(
             "Local job storage is unavailable; preserve existing data for recovery"
         ) from None
-
-
-def open_provider_store(root, profile, *, project_id=None, team_id=None):
-    """Use a local salted identity; provider secrets never enter the jobs database."""
-    from ..providers.config import ProviderProfile
-
-    if not isinstance(profile, ProviderProfile) or profile.provider == "scenario":
-        raise ValueError("Choose an external provider profile")
-    JobScope(profile.base_url, "local", project_id, team_id)
-    try:
-        root = Path(root).absolute()
-        if root.is_symlink():
-            raise StoreError("Local job storage must use a private directory")
-        root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        root = root.resolve(strict=True)
-        database = root / "jobs.sqlite3"
-        key = _scope_key(root, database)
-        payload = json.dumps(["provider-v1", profile.storage_identity_hash]).encode()
-        identity = "local-provider-" + hmac.new(key, payload, hashlib.sha256).hexdigest()
-        return JobStore(database, JobScope(profile.base_url, identity, project_id, team_id))
-    except OSError:
-        raise StoreError(
-            "Local job storage is unavailable; preserve existing data for recovery"
-        ) from None

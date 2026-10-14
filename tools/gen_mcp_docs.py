@@ -11,11 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 START, END = "<!-- tools:start -->", "<!-- tools:end -->"
 GROUPS = (
     (
-        "Assistant image tools (local, no generation provider required)",
+        "Assistant image tools",
         "scenario/mcp/tools_agent.py",
     ),
     ("Scene tools (run on Blender's main thread)", "scenario/mcp/tools_blender.py"),
-    ("Scenario tools", "scenario/mcp/tools_scenario.py"),
 )
 
 
@@ -127,8 +126,6 @@ def render(groups):
                 notes.append("destructive annotation")
             if re.search(r"\bGUI\b", description) or "Do not use in background mode" in description:
                 notes.append("GUI required")
-            if "spends the user's credits" in description:
-                notes.append("spends credits")
             if "Disabled by default" in description:
                 notes.append("Python preference gate; off by default")
             lines.append(

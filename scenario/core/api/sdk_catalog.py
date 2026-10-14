@@ -38,13 +38,7 @@ class SDKCatalog:
     """
 
     def __init__(self, credentials, *, online, adapter_factory=None, scope=None):
-        from ..providers.config import ProviderProfile
-
-        if isinstance(credentials, ProviderProfile):
-            if adapter_factory is None:
-                raise ValueError("Select an adapter for the configured provider")
-        else:
-            credentials.authorization()
+        credentials.authorization()
         if scope is not None and not isinstance(scope, JobScope):
             raise ValueError("Use an explicit job scope")
         self._scope = scope
@@ -62,14 +56,6 @@ class SDKCatalog:
         self._summaries = {}
         self._summary_reads = {}
         self.update_online(online)
-
-    def _record(self, data):
-        from ..providers.config import ProviderProfile
-
-        provider = (
-            self._credentials.provider if isinstance(self._credentials, ProviderProfile) else None
-        )
-        return ModelRecord.from_api(data, provider=provider)
 
     @property
     def scope(self):
@@ -183,7 +169,7 @@ class SDKCatalog:
             rows = pending.result()
             with self._condition:
                 self._check_active()
-            return [self._record(copy.deepcopy(row)) for row in rows]
+            return [ModelRecord.from_api(copy.deepcopy(row)) for row in rows]
         try:
             rows, records = self._fetch_list(privacy)
             pending.set_result(copy.deepcopy(rows))
@@ -199,7 +185,7 @@ class SDKCatalog:
         with self._read() as adapter:
             rows = adapter.models(privacy=privacy)
             try:
-                records = [self._record(row) for row in rows]
+                records = [ModelRecord.from_api(row) for row in rows]
             except (AttributeError, TypeError, ValueError):
                 raise ScenarioError(0, "Scenario returned an invalid model catalog") from None
             with self._condition:
@@ -249,13 +235,8 @@ class SDKCatalog:
 
     def check_connection(self):
         """Verify model access with one SDK read, without inferring identity."""
-        from ..providers.base import ProviderAdapter
-
         with self._read() as adapter:
-            if isinstance(adapter, ProviderAdapter):
-                adapter.test_connection()
-            else:
-                adapter.model_page(page_size=1)
+            adapter.model_page(page_size=1)
             with self._condition:
                 self._check_active()
 
@@ -263,13 +244,13 @@ class SDKCatalog:
         with self._condition:
             self._check_active()
             rows = copy.deepcopy(self._lists.get(privacy))
-        return None if rows is None else [self._record(row) for row in rows]
+        return None if rows is None else [ModelRecord.from_api(row) for row in rows]
 
     def load_cached(self, model_id):
         with self._condition:
             self._check_active()
             row = copy.deepcopy(self._records.get(model_id))
-        return None if row is None else self._record(row)
+        return None if row is None else ModelRecord.from_api(row)
 
     def get_many(self, model_ids, refresh=False):
         """Bulk model summaries by ID, read at most once per connection.
@@ -320,7 +301,7 @@ class SDKCatalog:
         with self._condition:
             self._check_active()
             return {
-                model_id: self._record(copy.deepcopy(rows[model_id]))
+                model_id: ModelRecord.from_api(copy.deepcopy(rows[model_id]))
                 for model_id in requested
                 if rows[model_id] is not None
             }
@@ -330,7 +311,7 @@ class SDKCatalog:
             found = adapter.models_bulk(model_ids)
             try:
                 for row in found.values():
-                    self._record(row)
+                    ModelRecord.from_api(row)
             except (AttributeError, TypeError, ValueError):
                 raise ScenarioError(0, "Scenario returned an invalid model summary") from None
             with self._condition:
@@ -369,7 +350,7 @@ class SDKCatalog:
         with self._condition:
             self._check_active()
             if not refresh and model_id in self._records:
-                return self._record(copy.deepcopy(self._records[model_id]))
+                return ModelRecord.from_api(copy.deepcopy(self._records[model_id]))
             pending = self._model_reads.get(model_id)
             owner = pending is None
             if owner:
@@ -378,10 +359,10 @@ class SDKCatalog:
             row = pending.result()
             with self._condition:
                 self._check_active()
-            return self._record(copy.deepcopy(row))
+            return ModelRecord.from_api(copy.deepcopy(row))
         try:
             row = self._fetch_model(model_id)
-            record = self._record(row)
+            record = ModelRecord.from_api(row)
             pending.set_result(copy.deepcopy(row))
             return record
         except BaseException as error:
@@ -398,7 +379,7 @@ class SDKCatalog:
                 raise ScenarioError(0, "Scenario returned a different model identity")
             try:
                 # Forms parse this schema on the main thread; reject it before caching.
-                parse_schema(self._record(row))
+                parse_schema(ModelRecord.from_api(row))
             except (AttributeError, KeyError, TypeError, ValueError):
                 raise ScenarioError(0, "Scenario returned an invalid model description") from None
             with self._condition:

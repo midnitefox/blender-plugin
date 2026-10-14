@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Folder and link buttons: the system's default application, without Scenario credentials.
+"""Folder and link buttons with a sanitized child-process environment.
 
 Blender's ``wm.path_open`` and ``wm.url_open`` start ``open``, ``xdg-open``,
 ``osascript`` or ``os.startfile`` with Blender's whole environment, and the
@@ -83,7 +83,7 @@ def report_open(operator, opener, target, failure):
 class SCENARIO_OT_open_path(bpy.types.Operator):
     bl_idname = "scenario.open_path"
     bl_label = "Open"
-    bl_description = "Open with the system's default application, without Scenario credentials"
+    bl_description = "Open with the system's default application"
     bl_options = {"INTERNAL"}
     filepath: StringProperty(subtype="FILE_PATH", options={"SKIP_SAVE"})
 
@@ -94,7 +94,7 @@ class SCENARIO_OT_open_path(bpy.types.Operator):
 class SCENARIO_OT_open_url(bpy.types.Operator):
     bl_idname = "scenario.open_url"
     bl_label = "Open link"
-    bl_description = "Open this page in the default web browser, without Scenario credentials"
+    bl_description = "Open this page in the default web browser"
     bl_options = {"INTERNAL"}
     url: StringProperty(name="URL", options={"SKIP_SAVE"})
 

@@ -204,13 +204,8 @@ def parse_schema(record):
         if not name:
             continue
         ptype = raw.get("type") or "string"
-        integer = ptype == "integer"
-        if integer:
-            ptype = "number"
         always, if_defined, if_not_defined = _parse_required(raw.get("required"))
-        allowed = tuple(
-            raw.get("allowedValues") or raw.get("allowed_values") or raw.get("enum") or ()
-        )
+        allowed = tuple(raw.get("allowedValues") or raw.get("allowed_values") or ())
         labels = {}
         for key, label in (selects.get(name) or {}).items():
             match = next((v for v in allowed if str(v) == str(key)), key)
@@ -230,7 +225,7 @@ def parse_schema(record):
                 allowed_labels=labels,
                 min=raw.get("min"),
                 max=raw.get("max"),
-                step=raw.get("step", 1 if integer else None),
+                step=raw.get("step"),
                 max_length=raw.get("maxLength") or raw.get("max_length"),
                 cost_impact=bool(raw.get("costImpact") or raw.get("cost_impact")),
                 kind=raw.get("kind"),

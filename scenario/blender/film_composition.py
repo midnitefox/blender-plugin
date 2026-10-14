@@ -13,7 +13,6 @@ from ..core.jobs.coordinator import OriginQuote
 from ..core.jobs.film_media import VerifiedComposition
 from ..core.jobs.media_probe import MediaProbeError
 from ..core.scene.film_plan import FilmSourceError, require_plan_scope
-from ..core.ui.costs import quote_cost_fields
 from . import film_jobs
 from .film_application import _main_thread
 
@@ -178,7 +177,7 @@ class FilmCompositionCommands:
                             raise ValueError("Unexpected composition quote")
                         review.quote, review.cost, review.phase = (
                             result,
-                            result.estimate.approval_amount,
+                            str(result.estimate.cost),
                             "QUOTED",
                         )
                         review.parameters = result.estimate.payload
@@ -283,7 +282,6 @@ class FilmCompositionCommands:
             "sources": review.sources,
             "layers": review.layers,
             "cu_cost_exact": review.cost,
-            **(quote_cost_fields(review.quote.estimate) if review.quote is not None else {}),
             "request_id": review.request_id,
             "error": review.error,
             "parameters": copy.deepcopy(review.parameters) if include_parameters else None,

@@ -1,16 +1,28 @@
-# Scenario for Blender documentation
+# Open Studio for Blender documentation
 
-Start with the [repository overview](../README.md), [user guide](USER_GUIDE.md) and
-[known limitations](KNOWN_LIMITATIONS.md) before relying on an experimental
-workflow. The [changelog](../CHANGELOG.md) records releases. Documentation of a
-new primitive does not mean it is wired into the user interface or local MCP.
+Use the current assistant-only guides for installation and everyday work:
 
-For questions, bugs or account help, see [Support](../SUPPORT.md).
-
-## Architecture and implementation
-
-- [Local MCP tools, setup and security](MCP.md)
+- [Repository overview](../README.md)
+- [User guide](USER_GUIDE.md)
+- [Local MCP setup, tools and security](MCP.md)
 - [Privacy and data handling](PRIVACY.md)
+- [Support](../SUPPORT.md)
+
+The active workflow is assistant-generated image handoff and local Blender
+control. Direct generation-service setup and the upstream model workflow are not
+part of this build. The [changelog](../CHANGELOG.md) retains upstream release
+history and does not establish this fork's current feature coverage.
+
+## Historical upstream implementation reference
+
+The guides below document inherited source and design decisions. They may name
+retired panels, service operations, old screenshots or workflows that are not
+registered in this build. Use them for source maintenance; use the current
+guides above for setup and supported features.
+
+- [Inherited known limitations](KNOWN_LIMITATIONS.md)
+### Architecture and implementation
+
 - [Runtime map and integration status](architecture/runtime.md)
 - [Blender boundaries and scene application](architecture/blender.md)
 - [SDK adoption and operation contracts](SDK_ADOPTION.md)
@@ -29,6 +41,9 @@ For questions, bugs or account help, see [Support](../SUPPORT.md).
 
 ## Development and contributions
 
+Retained engineering guides include upstream integration and release assumptions.
+Apply the assistant-only scope when those assumptions conflict with this build.
+
 - [Private vulnerability reporting and security scope](../SECURITY.md)
 - [Trademarks and official builds](../TRADEMARKS.md)
 - [Contributor setup and environment](../CONTRIBUTING.md)
@@ -42,11 +57,11 @@ For questions, bugs or account help, see [Support](../SUPPORT.md).
 - [Agent skills and command adapters](development/agents.md)
 - [Release procedure](RELEASING.md)
 
-## Maintenance and historical evidence
+## Historical maintenance and evidence
 
 - [Repository baseline and pending administration](MAINTAINERS.md)
 - [Knowledge checks and review procedure](maintenance/knowledge.md)
-- [API-key release plan](maintenance/release-plan.md)
+- [Upstream release plan](maintenance/release-plan.md)
 - [0.10.0 release acceptance record](maintenance/release-acceptance.md)
 - [Licence decision and the alternatives compared](maintenance/licence-options.md)
 - [Issue disposition and limitations audit](maintenance/backlog.md)
