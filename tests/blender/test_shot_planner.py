@@ -77,7 +77,7 @@ class ShotPlannerTests(unittest.TestCase):
         self.assertEqual([m.name for m in markers], ["Shot 1", "Shot 2"])
         self.assertEqual([int(m["scenario_shot_index"]) for m in markers], [1, 2])
         self.assertTrue(all(m.type == "CAMERA" and m.show_name for m in markers))
-        self.assertIn(markers[0].name, bpy.data.collections["Scenario Shots"].objects)
+        self.assertIn(markers[0].name, bpy.data.collections["Open Studio Shots"].objects)
         self.assertEqual(self.props.markers_source, "markers")
         self.props.duration = 5.0
         bpy.ops.scenario.shot_build_path()
@@ -101,7 +101,7 @@ class ShotPlannerTests(unittest.TestCase):
             0.0,
             places=4,
         )
-        constraint = cam.constraints.get("Scenario Aim")
+        constraint = cam.constraints.get("Open Studio Aim")
         self.assertIsNotNone(constraint)
         self.assertEqual(constraint.target.name, "Shot Target")
 
@@ -210,7 +210,7 @@ class ShotPlannerTests(unittest.TestCase):
         cam = self.sp.shot_camera(self.scene)
         paths = {fc.data_path for fc in self.sp.fcurves_of(cam)}
         self.assertIn("rotation_euler", paths)
-        self.assertIsNone(cam.constraints.get("Scenario Aim"))
+        self.assertIsNone(cam.constraints.get("Open Studio Aim"))
         self.assertIsNone(bpy.data.objects.get("Shot Target"))
         # the camera looks at the cube: its -Z axis points from the camera towards the centre
         self.scene.frame_set(1)
@@ -285,13 +285,13 @@ class ShotPlannerTests(unittest.TestCase):
         self.assertEqual(len(frames), len(markers))
         self.assertEqual(frames[-1], round(3.0 * self.fps))
         self.assertEqual(cam["scenario_shot_source"], "pan")
-        self.assertEqual(len([c for c in cam.constraints if c.name == "Scenario Aim"]), 1)
+        self.assertEqual(len([c for c in cam.constraints if c.name == "Open Studio Aim"]), 1)
         self.assertEqual(
             len(
                 [
                     o
                     for o in bpy.data.objects
-                    if o.type == "CAMERA" and o.name.startswith("Scenario Shot Camera")
+                    if o.type == "CAMERA" and o.name.startswith("Open Studio Shot Camera")
                 ]
             ),
             1,
@@ -302,16 +302,16 @@ class ShotPlannerTests(unittest.TestCase):
         original = bpy.context.active_object
         self.scene.camera = original
         bpy.ops.scenario.shot_build_path()
-        self.assertEqual(self.scene.camera.name, "Scenario Shot Camera")
+        self.assertEqual(self.scene.camera.name, "Open Studio Shot Camera")
         self.assertEqual(self.props.previous_camera, original.name)
         self.assertTrue(
-            self.sp.path_summary(self.scene).startswith("Scenario Shot Camera, 12 markers")
+            self.sp.path_summary(self.scene).startswith("Open Studio Shot Camera, 12 markers")
         )
         bpy.ops.scenario.shot_clear_path()
         self.assertIsNone(self.sp.shot_camera(self.scene))
         self.assertIsNone(bpy.data.objects.get("Shot Target"))
         self.assertEqual(self.sp.marker_objects(self.scene), [])
-        self.assertIsNone(bpy.data.collections.get("Scenario Shots"))
+        self.assertIsNone(bpy.data.collections.get("Open Studio Shots"))
         self.assertEqual(self.scene.camera, original)
         self.assertEqual(self.sp.path_summary(self.scene), "")
         self.assertEqual(self.props.previous_camera, "")

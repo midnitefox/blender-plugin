@@ -15,28 +15,46 @@ SPEC.loader.exec_module(generator)
 
 
 def test_committed_reference_matches_all_registered_source_contracts():
-    doc = (ROOT / "docs/MCP.md").read_text()
+    doc = (ROOT / "docs/MCP.md").read_text(encoding="utf-8")
     assert generator.replace_block(doc, generator.generated()) == doc
-    mapping = doc.split("## Local server and mcp.scenario.com", 1)[1]
     names = []
     for _, relative in generator.GROUPS:
         for tool in generator.parse_specs(ROOT / relative):
             names.append(tool["name"])
-            assert re.search(r"`" + re.escape(tool["name"]) + r"(?:\(|`)", mapping)
+            assert re.search(r"`" + re.escape(tool["name"]) + r"(?:\(|`)", doc)
     assert len(names) == len(set(names))
+    assert {Path(path).name for _, path in generator.GROUPS} == {
+        "tools_agent.py",
+        "tools_agent_materials.py",
+        "tools_agent_results.py",
+        "tools_agent_media.py",
+        "tools_agent_models.py",
+        "tools_agent_packages.py",
+        "tools_agent_mesh.py",
+        "tools_agent_blockout.py",
+        "tools_agent_capture.py",
+        "tools_agent_film.py",
+        "tools_agent_film_scene.py",
+        "tools_agent_film_review.py",
+        "tools_agent_film_export.py",
+        "tools_blender.py",
+    }
+    assert "generate" not in names and "estimate_cost" not in names
     for relative in ("README.md", "docs/USER_GUIDE.md", "docs/MCP.md"):
-        assert not re.search(r"\b\d+ tools\b", (ROOT / relative).read_text())
+        assert not re.search(r"\b\d+ tools\b", (ROOT / relative).read_text(encoding="utf-8"))
 
 
 def test_renamed_tool_is_detected_as_documentation_drift(tmp_path):
     source = ROOT / "scenario/mcp/tools_blender.py"
     changed = tmp_path / "tools_blender.py"
-    changed.write_text(source.read_text().replace('"scene_summary",', '"renamed_summary",', 1))
+    changed.write_text(
+        source.read_text(encoding="utf-8").replace('"scene_summary",', '"renamed_summary",', 1)
+    )
     groups = [
         (generator.GROUPS[0][0], generator.parse_specs(changed)),
         (generator.GROUPS[1][0], generator.parse_specs(ROOT / generator.GROUPS[1][1])),
     ]
-    doc = (ROOT / "docs/MCP.md").read_text()
+    doc = (ROOT / "docs/MCP.md").read_text(encoding="utf-8")
     assert generator.replace_block(doc, generator.render(groups)) != doc
 
 
@@ -71,20 +89,40 @@ def test_malformed_markers_fail_instead_of_rewriting_unrelated_text(document):
         generator.replace_block(document, "replacement\n")
 
 
-def test_initialize_guidance_identifies_hosted_platform_boundary():
+def test_named_schema_is_resolved_without_importing_the_tool_module(tmp_path):
+    path = tmp_path / "tool.py"
+    path.write_text("""raise RuntimeError("Never import this module")
+_OPERATION = _schema({"operation_id": {"type": "string"}}, ["operation_id"])
+SPECS = [ToolSpec("status", "Read status.", _OPERATION, handler)]
+""")
+    tool = generator.parse_specs(path)[0]
+    assert tool["properties"] == {"operation_id": {"type": "string"}}
+    assert tool["required"] == ["operation_id"]
+
+
+def test_initialize_guidance_uses_assistant_image_handoff():
     from scenario.mcp.protocol import INSTRUCTIONS
 
-    # This is explanatory prose, not a URL validation boundary.
-    assert any(word == "mcp.scenario.com" for word in INSTRUCTIONS.split())
+    assert "scene_summary" in INSTRUCTIONS
+    assert INSTRUCTIONS.index("agent_workspace") < INSTRUCTIONS.index("import_agent_image")
+    assert "mcp.scenario.com" not in INSTRUCTIONS
+    assert "estimate_cost" not in INSTRUCTIONS
+    assert "CU cost" not in INSTRUCTIONS
 
 
-def test_initialize_guidance_routes_local_organization_through_review():
+def test_current_entrypoints_do_not_route_users_to_upstream_service_setup():
     from scenario.mcp.protocol import INSTRUCTIONS
 
-    review = INSTRUCTIONS.index("prepare_asset_organization")
-    assert review < INSTRUCTIONS.index("apply_asset_organization")
-    assert "explicit approval" in INSTRUCTIONS
-    assert "never repeat an unconfirmed change" in INSTRUCTIONS
-    reference = (ROOT / "docs/MCP.md").read_text()
-    assert "\n## Asset organization\n" in reference
-    assert "(#asset-organization)" in reference
+    assert "execute_python" in INSTRUCTIONS
+    assert "explicitly enabled" in INSTRUCTIONS
+    for relative in (
+        "README.md",
+        "docs/USER_GUIDE.md",
+        "docs/MCP.md",
+        "docs/PRIVACY.md",
+        "SUPPORT.md",
+    ):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "blender.scenario.com/repo" not in text
+        assert "SCENARIO_API_KEY" not in text
+        assert "mcp.scenario.com" not in text

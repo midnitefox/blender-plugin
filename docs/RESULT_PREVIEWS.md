@@ -376,7 +376,7 @@ Measured with generated files on macOS arm64 Blender 5.1.2, a decode took about
 ## Local MCP inspection
 
 The local MCP tool
-[`inspect_result_previews`](MCP.md#saved-result-previews) uses the session's
+[`inspect_result_previews`](MCP.md#historical-upstream-reference) uses the session's
 scheduler on Blender's main thread, like the native controls. It checks the
 context token and the saved job's revision and state, then requests the same
 renditions they do: the stills of every result the tiles page through, in

@@ -86,7 +86,9 @@ def test_manifest_schema_and_type():
 
 def test_manifest_extension_id_is_stable():
     value = manifest()["id"]
-    assert value == "scenario", "Renaming the extension breaks updates and per-user storage"
+    assert value == "open_studio", (
+        "The independent fork must keep separate update and storage identity"
+    )
     assert re.fullmatch(r"[a-z][a-z0-9_]*", value)
 
 
@@ -191,12 +193,9 @@ def test_network_permission_matches_code():
     assert declared == bool(uses), f"Network imports: {uses}; declared={declared}"
 
 
-def test_network_permission_discloses_the_api_and_the_local_listener():
-    # Local MCP starts by default in GUI sessions with Online Access on (#448).
-    # Exact text: it names the API host and the loopback listener within Blender's limit.
-    assert permissions()["network"] == (
-        "Scenario API (api.cloud.scenario.com), local agents on 127.0.0.1"
-    )
+def test_network_permission_discloses_the_local_assistant_listener():
+    # Local MCP starts in GUI sessions with Online Access on; generation is external.
+    assert permissions()["network"] == "Connect local assistants on 127.0.0.1"
 
 
 def test_permission_reasons_follow_manifest_rules():
@@ -209,4 +208,4 @@ def test_permission_reasons_follow_manifest_rules():
 
 def test_manifest_website_points_at_the_published_handbook():
     website = manifest()["website"]
-    assert website == "https://blender.scenario.com/", website
+    assert website == "https://github.com/midnitefox/blender-plugin", website

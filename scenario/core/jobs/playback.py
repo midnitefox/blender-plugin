@@ -249,7 +249,8 @@ def player_environment(environ=None):
     return {
         key: value
         for key, value in environ.items()
-        if not key.upper().startswith(("SCENARIO_", "PYTHON")) and key.upper() not in _PROXIES
+        if not key.upper().startswith(("SCENARIO_", "OPEN_STUDIO_", "PYTHON"))
+        and key.upper() not in _PROXIES
     }
 
 

@@ -46,7 +46,7 @@ reads base-model descriptions on demand
 Local MCP `list_models` with the trained source starts the same reads and lists the
 same rows, `estimate_cost` and `render_form` build trained choices with the same
 `trained_routes.apply` as the forms, and `model_defaults` uses the forms' defaults
-owner ([trained models through local MCP](../MCP.md#trained-models-loras-and-compositions)).
+owner ([trained models through local MCP](../MCP.md#historical-upstream-reference)).
 Lane lists and the picker's other
 chips keep their former exclusion of LoRAs, compositions and other trained
 types, and still list a private custom model that reaches them.
@@ -55,7 +55,7 @@ See [trained-model catalog reads](../SDK_ADOPTION.md#trained-model-catalog-reads
 The GUI pump and main-thread MCP catalog/schema calls deliver the same queued
 completions. An MCP call that needs a model description not loaded yet waits for
 its read's worker on the request thread, then delivers it on the main thread
-([MCP quote contract](../MCP.md#model-quote-and-submission-contract)). Credential changes retire the context, discard its model/schema
+([MCP quote contract](../MCP.md#historical-upstream-reference)). Credential changes retire the context, discard its model/schema
 caches and visible quotes, and reject late success/error events from the old
 context. Main-thread entry points and GUI ticks mirror Blender's online-access
 permission into a thread-safe event; each SDK request, including subsequent

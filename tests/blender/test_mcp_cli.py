@@ -29,15 +29,15 @@ class McpCliTests(unittest.TestCase):
             profile and Path(profile).is_absolute(), "Require the runner's isolated profile"
         )
         for key in list(env):
-            if key.startswith("SCENARIO_"):
+            if key.startswith(("SCENARIO_", "OPEN_STUDIO_")):
                 env.pop(key)
         return env
 
     def test_cli_command_is_registered_and_has_help(self):
         self.assertIsNotNone(submodule("blender.runtime").state.cli_handle)
         for args, expected in [
-            (["help"], "scenario_blender"),
-            (["scenario_blender", "--help"], "usage: scenario_blender"),
+            (["help"], "open_studio"),
+            (["open_studio", "--help"], "usage: open_studio"),
         ]:
             result = subprocess.run(
                 [bpy.app.binary_path, "--background", "--command", *args],
@@ -85,7 +85,7 @@ class McpCliTests(unittest.TestCase):
             port = reservation.getsockname()[1]
         token = "synthetic-cli-token"
         env = self.child_environment()
-        env["SCENARIO_BLENDER_TOKEN"] = token
+        env["OPEN_STUDIO_TOKEN"] = token
         with tempfile.TemporaryFile(mode="w+") as log:
             process = subprocess.Popen(
                 [
@@ -93,7 +93,7 @@ class McpCliTests(unittest.TestCase):
                     "--background",
                     "--online-mode",
                     "--command",
-                    "scenario_blender",
+                    "open_studio",
                     "--port",
                     str(port),
                 ],
@@ -141,7 +141,7 @@ class McpCliTests(unittest.TestCase):
                 log.seek(0)
                 output = log.read()
                 self.assertEqual(returncode, 0, output)
-                self.assertIn("token provided; hidden", output)
+                self.assertIn("local authentication enabled", output)
                 self.assertNotIn(token, output)
                 self.assertNotIn("not registered", output)
                 with socket.socket() as closed:

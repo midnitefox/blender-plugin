@@ -100,6 +100,7 @@ EXPECTED = {
         "screenshot_viewport",
         "camera_path",
         "render_still",
+        "snapshot_render_result",
         "blender_api_help",
         "datablocks_summary",
     },
@@ -142,13 +143,13 @@ def test_real_tool_descriptions_are_complete_static_contracts(module):
         assert len(description) >= 120, name
         assert all(label in description for label in ("Args:", "Returns:", "Example:")), name
         assert description.count("Returns:") == 1, name  # One complete return contract.
-        assert re.search(
-            r"\n(?:Platform equivalent: [^\n]+|No platform equivalent)\.$", description
-        )
-        if module == "tools_scenario" and name != "import_result":
-            assert "Platform equivalent:" in description, name
+        if module == "tools_scenario":
+            assert re.search(
+                r"\n(?:Platform equivalent: [^\n]+|No platform equivalent)\.$", description
+            )
         else:
-            assert description.endswith("No platform equivalent."), name
+            assert "platform equivalent" not in description.lower(), name
+            assert "generation estimate" not in description, name
     assert len(names) == len(set(names))
     assert set(names) == EXPECTED[module]
 
@@ -461,10 +462,10 @@ def test_workflow_step_tools_require_the_users_explicit_choice():
     ]
 
 
-def test_server_instructions_require_explicit_workflow_step_decisions():
+def test_server_instructions_limit_default_work_to_local_blender_and_assistant_images():
     from scenario.mcp.protocol import INSTRUCTIONS
 
-    assert (
-        "Decide waiting workflow steps (workflow_job_steps, decide_workflow_step) only with "
-        "the user's explicit choice." in INSTRUCTIONS
-    )
+    assert "agent_workspace" in INSTRUCTIONS and "import_agent_image" in INSTRUCTIONS
+    assert "scene_summary" in INSTRUCTIONS
+    assert "workflow_job_steps" not in INSTRUCTIONS
+    assert "mcp.scenario.com" not in INSTRUCTIONS

@@ -202,7 +202,7 @@ simulated unexpected color spaces fail closed after decoding. They make no
 Scenario service calls.
 
 JobSession binds verified downloads to guarded durable World application. The
-[Environment lane](MCP.md#environment-lane-360-panoramas), in the native sidebar,
+[Environment lane](MCP.md#historical-upstream-reference), in the native sidebar,
 Studio, composer and local MCP, quotes and submits verified panorama model
 contracts, and its results stay saved for the approval below.
 

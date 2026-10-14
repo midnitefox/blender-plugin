@@ -1,19 +1,74 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""stdio <-> local HTTP bridge for MCP clients that only launch commands (Claude Desktop).
+"""stdio <-> local HTTP bridge for command-based MCP clients.
 
-Reads newline-delimited JSON-RPC on stdin, forwards each message to the Scenario for Blender server,
+Reads newline-delimited JSON-RPC on stdin, forwards each message to the local Blender server,
 writes the JSON response on stdout. Standard library only; no bpy.
 
 Usage: python3 stdio_shim.py --url http://127.0.0.1:9876/mcp --token TOKEN
 """
 
 import argparse
+import ipaddress
 import json
+import pathlib
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        # The bearer token belongs only to the configured local server.
+        return None
+
+
+def read_connection_file(path):
+    """Read the extension-owned loopback connection afresh for every request.
+
+    Token rotation after a Blender restart requires no new agent configuration.
+    Invalid or stopped connections never expose the path or file contents.
+    """
+    try:
+        path = pathlib.Path(path)
+        if not path.is_absolute() or path.is_symlink() or not path.is_file():
+            raise ValueError
+        with path.open("rb") as stream:
+            raw = stream.read(4097)
+        if len(raw) > 4096:
+            raise ValueError
+        config = json.loads(raw)
+        if not isinstance(config, dict) or set(config) != {"url", "token"}:
+            raise ValueError
+        url, token = config["url"], config["token"]
+        if not isinstance(url, str) or not isinstance(token, str):
+            raise ValueError
+        if not 1 <= len(token) <= 256 or any(not 33 <= ord(c) <= 126 for c in token):
+            raise ValueError
+        parsed = urllib.parse.urlsplit(url)
+        host = parsed.hostname
+        if (
+            parsed.scheme != "http"
+            or not host
+            or parsed.port is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path != "/mcp"
+            or parsed.query
+            or parsed.fragment
+            or "?" in url
+            or "#" in url
+        ):
+            raise ValueError
+        if host != "localhost" and not ipaddress.ip_address(host).is_loopback:
+            raise ValueError
+        return url, token
+    except (OSError, ValueError, TypeError, UnicodeError):
+        raise ValueError(
+            "Blender connection unavailable. Start Blender and its assistant connection, then retry."
+        ) from None
 
 
 def forward(url, token, message, timeout=300):
@@ -29,7 +84,8 @@ def forward(url, token, message, timeout=300):
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+        with opener.open(req, timeout=timeout) as resp:
             body = resp.read()
             return json.loads(body) if body else None
     except urllib.error.HTTPError as err:
@@ -51,9 +107,13 @@ def forward(url, token, message, timeout=300):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="scenario-blender-stdio")
+    parser = argparse.ArgumentParser(prog="open-studio-stdio")
     parser.add_argument("--url", default="http://127.0.0.1:9876/mcp")
-    parser.add_argument("--token", required=True)
+    auth = parser.add_mutually_exclusive_group(required=True)
+    auth.add_argument("--token")
+    auth.add_argument(
+        "--connection-file", help="Private Blender connection file; reloaded per request"
+    )
     args = parser.parse_args(argv)
     out = sys.stdout
     for line in sys.stdin:
@@ -75,7 +135,19 @@ def main(argv=None):
             )
             out.flush()
             continue
-        response = forward(args.url, args.token, message)
+        try:
+            url, token = (
+                read_connection_file(args.connection_file)
+                if args.connection_file
+                else (args.url, args.token)
+            )
+            response = forward(url, token, message)
+        except ValueError as err:
+            response = {
+                "jsonrpc": "2.0",
+                "id": message.get("id"),
+                "error": {"code": -32001, "message": str(err)},
+            }
         if response is not None and message.get("id") is not None:
             out.write(json.dumps(response) + "\n")
             out.flush()

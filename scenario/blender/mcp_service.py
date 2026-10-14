@@ -6,7 +6,9 @@ import json
 import logging
 import os
 import secrets
+import shlex
 import sys
+import tempfile
 
 import bpy
 
@@ -14,18 +16,50 @@ from .. import __version__
 from ..mcp import protocol
 from ..mcp.cli import CLI_COMMAND, cli_banner, resolve_cli_token
 from ..mcp.server import McpServer
+from ..mcp.stdio_shim import read_connection_file
 from . import runtime
 
 log = logging.getLogger("scenario.mcp")
-SERVER_INFO = {"name": "scenario-blender", "version": __version__}
+SERVER_INFO = {"name": "open-studio", "version": __version__}
 
 
 def build_registry():
-    from ..mcp import tools_blender, tools_scenario
+    from ..mcp import (
+        tools_agent,
+        tools_agent_blockout,
+        tools_agent_capture,
+        tools_agent_film,
+        tools_agent_film_export,
+        tools_agent_film_review,
+        tools_agent_film_scene,
+        tools_agent_materials,
+        tools_agent_media,
+        tools_agent_mesh,
+        tools_agent_models,
+        tools_agent_packages,
+        tools_agent_results,
+        tools_blender,
+    )
 
     registry = protocol.Registry()
-    for spec in tools_blender.SPECS + tools_scenario.SPECS:
-        registry.add(spec)
+    for module in (
+        tools_agent,
+        tools_agent_blockout,
+        tools_agent_capture,
+        tools_agent_film,
+        tools_agent_film_export,
+        tools_agent_film_review,
+        tools_agent_film_scene,
+        tools_agent_materials,
+        tools_agent_media,
+        tools_agent_mesh,
+        tools_agent_models,
+        tools_agent_packages,
+        tools_agent_results,
+        tools_blender,
+    ):
+        for spec in module.SPECS:
+            registry.add(spec)
     return registry
 
 
@@ -60,7 +94,10 @@ def start():
             blender_version=bpy.app.version_string,
         )
         server.start()
+        _write_connection_file(server.url, runtime.state.mcp_token)
     except OSError as err:
+        if "server" in locals():
+            server.stop()
         runtime.state.mcp_error = str(err)
         runtime.state.mcp = None
         return None
@@ -73,11 +110,11 @@ def stop():
     server = runtime.state.mcp
     if server is not None:
         server.stop()
+        _remove_connection_file(server.url, runtime.state.mcp_token)
     runtime.state.mcp = None
 
 
 def process_pending():
-    runtime.sync_catalog_context()
     server = runtime.state.mcp
     if server is not None:
         server.process_pending()
@@ -89,14 +126,56 @@ def masked_token():
 
 
 def _blender_python():
-    candidates = [
+    windows = [
+        os.path.join(sys.prefix, "bin", "python.exe"),
+        os.path.join(sys.prefix, "python.exe"),
+    ]
+    unix = [
         os.path.join(sys.prefix, "bin", f"python{sys.version_info.major}.{sys.version_info.minor}"),
         os.path.join(sys.prefix, "bin", "python3"),
     ]
+    candidates = windows + unix if os.name == "nt" else unix
     for path in candidates:
-        if os.path.exists(path):
+        if os.path.isfile(path):
             return path
-    return "python3"
+    return "python" if os.name == "nt" else "python3"
+
+
+def connection_file_path():
+    return runtime.paths().state_dir / "agent-connection.json"
+
+
+def _write_connection_file(url, token):
+    """Publish only after the authenticated local server has started."""
+    destination = connection_file_path()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=destination.parent, prefix=".agent-", delete=False
+        ) as stream:
+            temporary = stream.name
+            os.chmod(temporary, 0o600)
+            json.dump({"url": url, "token": token}, stream)
+        os.replace(temporary, destination)
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _remove_connection_file(url, token):
+    """Do not remove another running instance's replacement connection."""
+    destination = connection_file_path()
+    try:
+        if read_connection_file(destination) == (url, token):
+            destination.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
+
+
+def _shell_argument(value):
+    # PowerShell single quotes are literal; double a quote embedded in a path.
+    return "'" + value.replace("'", "''") + "'" if os.name == "nt" else shlex.quote(value)
 
 
 def shim_path():
@@ -110,33 +189,34 @@ def client_configs():
     url, token = st["url"] or "http://127.0.0.1:9876/mcp", st["token"] or "<token>"
     stdio = {
         "mcpServers": {
-            "scenario-blender": {
+            "open-studio": {
                 "command": _blender_python(),
-                "args": [shim_path(), "--url", url, "--token", token],
+                "args": [shim_path(), "--connection-file", str(connection_file_path())],
             }
         }
     }
+    command = " ".join(
+        _shell_argument(arg)
+        for arg in (
+            _blender_python(),
+            shim_path(),
+            "--connection-file",
+            str(connection_file_path()),
+        )
+    )
     return {
-        "claude_code": f'claude mcp add --transport http scenario-blender {url} --header "Authorization: Bearer {token}"',
-        "cursor": json.dumps(
-            {
-                "mcpServers": {
-                    "scenario-blender": {
-                        "url": url,
-                        "headers": {"Authorization": f"Bearer {token}"},
-                    }
-                }
-            },
-            indent=2,
-        ),
+        "claude_code": "claude mcp add --transport stdio open-studio -- " + command,
+        "cursor": json.dumps(stdio, indent=2),
         "claude_desktop": json.dumps(stdio, indent=2),
-        "codex": f"codex mcp add scenario-blender --url {url} --bearer-token-env-var SCENARIO_BLENDER_TOKEN\n# then: export SCENARIO_BLENDER_TOKEN={token}",
+        "codex": "codex mcp add open-studio -- "
+        + command
+        + "\n# Keep Blender open with the assistant connection running. Reconnect MCP in Codex after setup.",
         "curl": f'curl -s -X POST {url} -H "Authorization: Bearer {token}" -H "Content-Type: application/json" -d \'{{"jsonrpc":"2.0","id":1,"method":"tools/list"}}\'',
     }
 
 
 def cli(argv):
-    """blender --background file.blend --command scenario_blender [--port N] [--token T]"""
+    """blender --background file.blend --command open_studio [--port N] [--token T]"""
     import argparse
     import signal
     import threading
@@ -146,7 +226,7 @@ def cli(argv):
     parser.add_argument(
         "--token",
         default=None,
-        help="Local MCP token; otherwise SCENARIO_BLENDER_TOKEN or a new token",
+        help="Local MCP token; otherwise OPEN_STUDIO_TOKEN or a private generated token",
     )
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
@@ -173,14 +253,16 @@ def cli(argv):
             previous[sig] = signal.signal(sig, lambda *_: stop_event.set())
         try:
             server.start()
+            _write_connection_file(server.url, token)
         except OSError as error:
             parser.error(f"Unable to start local MCP: {error}")
         print(cli_banner(server.url, token, generated), flush=True)
-        server.serve_blocking(stop_event, before_process=runtime.sync_catalog_context)
+        server.serve_blocking(stop_event)
     except KeyboardInterrupt:
         stop_event.set()
     finally:
         server.stop()
+        _remove_connection_file(server.url, token)
         for sig, handler in previous.items():
             # Blender can install a native handler that Python reports as None.
             # None is not accepted by signal.signal; the command is exiting.

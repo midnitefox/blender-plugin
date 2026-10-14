@@ -110,7 +110,7 @@ def isolated_environment(profile, temporary, environ=None):
     env = {
         key: value
         for key, value in original.items()
-        if not key.startswith(("SCENARIO_", "BLENDER_", "PYTHON"))
+        if not key.startswith(("SCENARIO_", "OPEN_STUDIO_", "BLENDER_", "PYTHON"))
     }
     env["BLENDER_USER_RESOURCES"] = str(Path(profile).resolve())
     env["PYTHONNOUSERSITE"] = "1"
@@ -141,6 +141,7 @@ def inspect_zip(path):
                 name.is_absolute()
                 or ".." in name.parts
                 or "\\" in entry.filename
+                or "\\" in entry.orig_filename
                 or ":" in entry.filename
                 or entry.filename in files
                 or stat.S_ISLNK(entry.external_attr >> 16)

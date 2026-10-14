@@ -63,7 +63,7 @@ def _prepare():
                 import importlib
 
                 name = next(
-                    n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario")
+                    n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
                 )
                 generation = importlib.import_module(name + ".blender.generation")
                 lane_state = bpy.context.scene.scenario.lane_state("edit3d")
@@ -84,7 +84,7 @@ def _prepare():
                 import importlib
 
                 name = next(
-                    n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario")
+                    n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
                 )
                 generation = importlib.import_module(name + ".blender.generation")
                 lane_state = bpy.context.scene.scenario.lane_state("3d")
@@ -94,7 +94,9 @@ def _prepare():
             # inject a couple of terminal generations (one failed with a long error) to show the error display + collapse all
             import importlib
 
-            name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+            name = next(
+                n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
+            )
             runtime = importlib.import_module(name + ".blender.runtime")
             records = importlib.import_module(name + ".core.jobs.records")
             runtime.state.jobs_view.clear()
@@ -120,7 +122,9 @@ def _prepare():
             # build a sample greybox (rich primitives + category colours) and frame it, on the Blockout tab
             import importlib
 
-            name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+            name = next(
+                n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
+            )
             blockout = importlib.import_module(name + ".blender.blockout")
             for o in list(bpy.context.scene.objects):
                 if o.type == "MESH":
@@ -227,7 +231,9 @@ def _prepare():
         if ACTION == "composer":
             import importlib
 
-            name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+            name = next(
+                n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
+            )
             runtime = importlib.import_module(name + ".blender.runtime")
             state = runtime.state.composer
             state.expanded = True
@@ -241,7 +247,9 @@ def _prepare():
             import json
             import subprocess
 
-            name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+            name = next(
+                n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
+            )
             service = importlib.import_module(name + ".blender.mcp_service")
             st = service.status()
             print("mcp status:", st["running"], st["url"])
@@ -289,7 +297,9 @@ def _prepare():
             import importlib
             import pathlib
 
-            name = next(n for n in bpy.context.preferences.addons.keys() if n.endswith(".scenario"))
+            name = next(
+                n for n in bpy.context.preferences.addons.keys() if n.endswith(".open_studio")
+            )
             capture = importlib.import_module(name + ".blender.capture")
             out_dir = pathlib.Path(OUT).parent
             clip = capture.capture_playblast(
@@ -310,7 +320,7 @@ def _prepare():
             )
         ui_region = next(r for r in area.regions if r.type == "UI")
         try:
-            ui_region.active_panel_category = "Scenario"
+            ui_region.active_panel_category = "Open Studio"
         except (AttributeError, TypeError) as err:
             print("active_panel_category not settable:", err)
         area.tag_redraw()
@@ -324,7 +334,7 @@ def _select_tab():
     try:
         window, area = _view3d()
         ui_region = next(r for r in area.regions if r.type == "UI")
-        ui_region.active_panel_category = "Scenario"
+        ui_region.active_panel_category = "Open Studio"
         area.tag_redraw()
         print("tab selected:", ui_region.active_panel_category)
     except Exception as err:
@@ -345,7 +355,7 @@ def _shot():
         window=window, screen=window.screen, area=area, region=ui_region
     ):
         try:
-            ui_region.active_panel_category = "Scenario"
+            ui_region.active_panel_category = "Open Studio"
             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=2)
         except Exception as err:
             print("forced redraw failed:", err)

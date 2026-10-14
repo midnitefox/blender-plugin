@@ -196,7 +196,7 @@ def test_relative_links_point_to_repository_and_fragments_stay_local(inputs):
     )
     text = build_handbook(**inputs).read_text()
     assert (
-        'href="https://github.com/scenario-labs/blender-plugin/blob/main/docs/More%20notes.md#details"'
+        'href="https://github.com/midnitefox/blender-plugin/blob/feat/provider-choice/docs/More%20notes.md#details"'
         in text
     )
     assert 'href="#install"' in text
@@ -206,8 +206,11 @@ def test_relative_links_point_to_repository_and_fragments_stay_local(inputs):
 def test_relative_directory_links_use_github_tree_urls(inputs):
     inputs["source"].write_text("[Images](images)\n\n[Repository](..)")
     text = build_handbook(**inputs).read_text()
-    assert 'href="https://github.com/scenario-labs/blender-plugin/tree/main/docs/images"' in text
-    assert 'href="https://github.com/scenario-labs/blender-plugin/tree/main"' in text
+    assert (
+        'href="https://github.com/midnitefox/blender-plugin/tree/feat/provider-choice/docs/images"'
+        in text
+    )
+    assert 'href="https://github.com/midnitefox/blender-plugin/tree/feat/provider-choice"' in text
 
 
 @pytest.mark.parametrize("inline", [False, True])

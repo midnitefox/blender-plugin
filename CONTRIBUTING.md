@@ -1,4 +1,4 @@
-# Contributing to Scenario for Blender
+# Contributing to Open Studio for Blender
 
 This guide covers the mechanics of a good contribution.
 [AGENTS.md](AGENTS.md) is the conventions contract for humans and agents and
@@ -7,12 +7,18 @@ takes precedence where the guides overlap. Read the
 
 ## Before you start
 
-Open an [issue](https://github.com/scenario-labs/blender-plugin/issues/new/choose)
-before work beyond a typo so maintainers can agree on the scope. Follow the
-[Code of Conduct](CODE_OF_CONDUCT.md). Account, billing and credit questions go
-through [Support](SUPPORT.md); report vulnerabilities through
-[Security](SECURITY.md), never in a public issue. Current account requirements
-belong in the [Scenario documentation](https://docs.scenario.com).
+Use this fork's [issues](https://github.com/midnitefox/blender-plugin/issues)
+for contribution scope and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Report vulnerabilities through [Security](SECURITY.md), never in a public issue.
+Open Studio connects to an assistant and does not require a Scenario account,
+generation credentials or credits. See the current [runtime map](docs/architecture/runtime.md)
+and [user guide](docs/USER_GUIDE.md) before implementing a workflow.
+
+This guide also retains upstream development utilities and service-contract
+examples. Those explicitly selected maintenance tools do not belong to the
+active assistant setup. Upstream account, package identity, publishing and
+organization conventions apply only to retained Scenario source and releases;
+the current installed extension id is `open_studio`.
 
 This repository is public and permanent. Keep issue text, PR text, commits and
 artifacts publicly shareable: no credentials or MCP bearer tokens, signed asset
@@ -203,7 +209,7 @@ the default unit-test collection and are not added to PR workflows.
 | --- | --- | --- | --- |
 | `SCENARIO_TEST_API_KEY`, `SCENARIO_TEST_API_SECRET` | `tools/dev_config.py`: `live_settings` | Required pair for smoke scripts, fixture recording and live payload audit; passed explicitly to the client, with no fallback to runtime credentials | Developer or CI secrets |
 | `SCENARIO_TEST_PROJECT_ID` | `tools/dev_config.py`: `live_settings` | Optional; unset/blank omits project selection. When supplied, sent as `projectId` in live-tool request queries | Developer or project-specific fixture |
-| `SCENARIO_API_KEY`, `SCENARIO_API_SECRET` | `scenario/core/config.py`: `resolve_credentials` | Used only when **Credentials > Environment** is explicitly selected in Scenario Preferences. Both values must come from that source; saved Blender credentials are the default. Not used by live-tool credential selection | Developer launching Blender |
+| `SCENARIO_API_KEY`, `SCENARIO_API_SECRET` | Retained `scenario/core/config.py`: `resolve_credentials` | Historical service helper only. The active Open Studio preferences and runtime do not read these variables | Explicit upstream maintenance only |
 | `SCENARIO_API_BASE` | `tools/audit_payloads.py`: `run` | Audit-only REST base URL; default `https://api.cloud.scenario.com/v1` | Developer |
 | `SCENARIO_SMOKE` | `tools/smoke_image.py`, `tools/smoke_suite.py`, `tools/smoke_inputs.py` | `=1` opts into explicitly authorized smoke spending or reference uploads; keep this out of dotenv files | Developer, on the command line after authorization; the protected smoke workflow |
 | `SCENARIO_GUI_PROBE` | `scenario/blender/operators.py`: `probe_mode`; Film and model-job approvals in `scenario/blender/`; `scenario/mcp/tools_scenario.py`: `generate`; `tools/capture_gui_scene.py` | `=1` blocks panel, Film, workflow and MCP generation during screenshots and desktop review; it is not a general network or spending sandbox | `tools/capture_gui.py`, `tools/gui_screenshot.py`, `tools/desktop_review.py` |
@@ -211,14 +217,14 @@ the default unit-test collection and are not added to PR workflows.
 | `SCENARIO_SHOT_SOURCE` | `tests/blender/test_shot_planner.py` | `=1` loads the shot planner from source rather than the installed extension; unsuitable as evidence of ZIP acceptance | Test tools |
 | `SCHEMA_CACHE` | `tools/audit_payloads.py` | Optional private persistent schema-cache root; otherwise each run uses a new temporary cache. Live subdirectories are partitioned by credentials, project and API base URL | Developer |
 
-`SCENARIO_BLENDER_TOKEN` supplies the local MCP bearer token to the headless
-`scenario_blender` command and the generated Codex client snippet. An explicit
-`--token` wins over this environment value. With neither configured, the command
-generates and displays a session token; supplied tokens are hidden in its startup
-banner. This is separate from Scenario API authentication. Empty or malformed
-explicit tokens are rejected rather than silently replaced.
+`OPEN_STUDIO_TOKEN` can supply the local MCP bearer token to the headless
+`open_studio` command. An explicit `--token` takes precedence. With neither
+configured, the command generates a session token. Every token stays out of
+startup output and copied client setup; the bundled bridge reads the private
+connection file. This authenticates the local assistant connection. Empty or
+malformed explicit tokens are rejected rather than silently replaced.
 
-A project ID is **not required for API-key authentication**. Leave the optional
+For retained upstream live tools, a project ID is **not required for API-key authentication**. Leave the optional
 project variable blank to use the API key’s default scope, or supply a project ID
 to select the intended project explicitly. Project-selection tests may require
 their own fixture and skip clearly when it is absent; that is not a global credential requirement.
@@ -459,7 +465,7 @@ Scenario credentials and Blender/Python path overrides, and retain per-phase log
 uv run --locked --no-env-file python tools/build.py --output dist
 uv run --locked --no-env-file python tools/build.py --repo
 uv run --locked --no-env-file python tools/build.py --repo /path/to/repository
-uv run --locked --no-env-file python tools/install.py --zip dist/scenario-<version>.zip --launch
+uv run --locked --no-env-file python tools/install.py --zip dist/open_studio-<version>.zip --launch
 ```
 
 `build.py` builds the manifest's exact ZIP, checks its GPL text and validates it

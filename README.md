@@ -1,212 +1,146 @@
-<p align="center">
-  <a href="https://www.scenario.com/"><img src="docs/images/scenario-logo.png" height="84" alt="Scenario"></a>
-</p>
-<h1 align="center">Scenario for Blender</h1>
-<p align="center">
-  <a href="https://github.com/scenario-labs/blender-plugin/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/scenario-labs/blender-plugin"></a>
-  <a href="LICENSE"><img alt="Licence GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue"></a>
-  <img alt="Blender 5.0 and later" src="https://img.shields.io/badge/Blender-5.0%2B-orange">
-  <a href="https://docs.scenario.com"><img alt="API documentation" src="https://img.shields.io/badge/documentation-api-black.svg"></a>
-  <a href="https://help.scenario.com"><img alt="App documentation" src="https://img.shields.io/badge/documentation-app-black.svg"></a>
-  <a href="https://mcp.scenario.com/docs"><img alt="MCP documentation" src="https://img.shields.io/badge/documentation-mcp-black.svg"></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/scenario-labs/blender-plugin"><img alt="OpenSSF Scorecard" src="https://img.shields.io/ossf-scorecard/github.com/scenario-labs/blender-plugin?label=openssf+scorecard&style=flat"></a>
-</p>
+# Open Studio for Blender
 
-**Experimental.** Bring Scenario image, video, 3D, PBR material, audio and 360
-environment generation into Blender. Use scene captures and selected meshes as
-inputs, explore camera moves, and turn a written scene description into a greybox
-layout with Blockout. A compact composer, sidebar, expanded Studio view and local
-MCP server provide access from your scene. This is a Python extension with pinned
-SDK dependency wheels, licensed GPL-3.0-or-later. Read the
-[known limitations](docs/KNOWN_LIMITATIONS.md) before relying on a workflow.
+Connect an assistant to Blender to inspect your scene, create camera moves, and
+bring assistant-created assets into your project. Open Studio is an
+assistant-only development fork of
+[Scenario for Blender](https://github.com/scenario-labs/blender-plugin), maintained
+in [midnitefox/blender-plugin](https://github.com/midnitefox/blender-plugin).
+It retains the upstream GPL license and copyright notices.
 
-![The Scenario sidebar with all creation tabs and a clearly labelled offline Image example](docs/images/panel-image.png)
+**Development preview:** the current workflow supports local scene tools and
+asset handoff for images, PBR map sets, panoramic environments, models and
+audio/video. Full creative feature parity with the upstream extension is
+incomplete. The assistant creates assets with its available tools; the extension
+imports the supplied results. Structured blockout, mesh-edit round trips and
+animated reference captures are also available. Film tools build editable shot
+scenes, assemble director timelines, arrange finished media for review, export
+MP4s and package portable editable projects.
+Existing-rig animation retargeting is unsupported.
 
-## Requirements
+## Install and connect
 
-- Blender 5.0 or later, as declared in the [extension manifest](scenario/blender_manifest.toml).
-- A Scenario account with API access, an API key and its secret. See
-  [Obtain your API key](https://docs.scenario.com/get-started/documentation/quick-start-guide/step-1-obtain-your-api-key)
-  and [Scenario help](https://help.scenario.com) for current account requirements.
-- An internet connection and Blender's **Allow Online Access** setting enabled
-  under Edit > Preferences > System > Network before contacting Scenario.
-- Scenario generations and prompt helpers consume Creative Units (CU). Review
-  the displayed estimate before Generate; models, parameters and references
-  affect the cost. See [costs](docs/USER_GUIDE.md#costs) and the limitations above.
+1. Use Blender 5.0 or later. Download the extension ZIP from this fork's
+   [releases](https://github.com/midnitefox/blender-plugin/releases) when a build
+   is available, or use a ZIP built from this checkout.
+2. In Blender, open **Edit > Preferences > Get Extensions**, open the menu in
+   the upper right and choose **Install from Disk**. Select the ZIP and enable
+   **Open Studio**. Disable an older copy before installing this build.
+3. Open the 3D viewport sidebar with **N**, then **Open Studio** in the viewport sidebar.
+   Allow Blender's online access for the local MCP listener and start the server.
+4. Copy the setup for your assistant from that panel. The Codex setup uses the
+   included stdio bridge and a private connection file, which follows Blender's
+   current local port and token. Keep Blender open, then reconnect MCP in the
+   assistant.
+5. Ask the assistant to inspect your Blender scene. For an image, ask it to use
+   its own image-generation tool and import the result into Blender.
 
-## Install
+Open Studio requires no generation account, API key, model selection or credits
+configuration. Image generation happens in your assistant and follows that
+assistant's availability and account settings. The extension cannot invoke the
+assistant's image-generation tool itself.
 
-Install from the official extension repository so that Blender can offer updates:
+## Work with images
 
-1. Turn on **Allow Online Access** under Edit > Preferences > System > Network.
-2. Open Edit > Preferences > Get Extensions > Repositories, choose **Add Remote
-   Repository** and enter `https://blender.scenario.com/repo/index.json`.
-3. Find Scenario in Get Extensions and install it. It appears as "Scenario" in
-   Blender's Add-ons list.
-4. In Scenario, open Organization settings > API Keys > Add API Key and follow
-   the instructions to obtain the key and secret.
-5. Open Edit > Preferences > Add-ons > Scenario. Leave **Credentials** set to
-   **Saved in Blender**, paste the key and secret, then press **Test connection**.
-   Choose an Output Folder for generated files.
+The assistant calls `agent_workspace`, saves or copies its generated image into
+the returned inbox, and calls `import_agent_image` with the filename. Supported
+files are PNG, JPEG and WebP, up to 64 MiB per image.
 
-To install from a ZIP instead, download `scenario-<version>.zip` from the
-[releases page](https://github.com/scenario-labs/blender-plugin/releases) and keep
-it zipped. Verify your download: for releases that include `SHA256SUMS`, save the
-ZIP, `scenario-handbook-<version>.html` and `SHA256SUMS` together, check them with
-`sha256sum -c SHA256SUMS` (macOS: `shasum -a 256 -c SHA256SUMS`) and, with the
-GitHub CLI, run `gh attestation verify scenario-<version>.zip -R scenario-labs/blender-plugin`
-([details](docs/USER_GUIDE.md#verify-your-download)). Historical `v*` releases have
-neither. Drag the ZIP onto a Blender window, or use Edit > Preferences > Get
-Extensions > Install from Disk, then continue with step 4. A ZIP copy does not
-update itself; see [Updates](#updates).
+| Import mode | Result in Blender |
+| --- | --- |
+| `REFERENCE` | An image reference at the 3D cursor for concept art or modeling. |
+| `TEXTURE` | A new base-color material in a named mesh's active slot. The mesh needs UV coordinates. |
+| `IMAGE` | A packed image datablock for later work. |
 
-### Updates
+Save the `.blend` file to retain the packed image. A base-color image supplies
+one material input. For a complete map set, use the material handoff below.
 
-A copy installed from the official repository updates through Blender. Open
-**Preferences > Add-ons > Scenario > Updates** for update checks and Blender's
-native Get Extensions manager. Enable **Allow Online Access** before checking.
-Updates are installed only when you choose them in Blender. The repository offers
-releases from 0.10.0 on.
+## Work with other assets
 
-A ZIP copy lives in Blender's local repository and does not update itself. Keep
-updating it with **Install from Disk**, followed by a restart, or switch to the
-repository: uninstall the ZIP copy first, install Scenario from the repository,
-then enter your key and secret again. Uninstalling deletes the ZIP copy's storage,
-including its stored jobs and the media that the video, sound and Film review
-strips Scenario added play from; past generations remain available under
-**Project history (cloud)** in Generations. Never keep both copies installed. Read
-[Switch from a ZIP to the repository](docs/USER_GUIDE.md#switch-from-a-zip-to-the-repository)
-before switching, and the [update guide](docs/USER_GUIDE.md#updates) for
-compatibility and manual fallback.
+Use the same local inbox and ask the assistant to choose the matching tool:
 
-### Why not extensions.blender.org
+| Asset | Local handoff |
+| --- | --- |
+| PBR material | `import_agent_material` applies supplied PNG/JPEG/WebP/EXR maps to a named UV mesh, including smoothness conversion and retained edge maps. |
+| Environment | `import_agent_environment` applies a supplied 2:1 equirectangular PNG, JPEG, EXR or Radiance HDR to the World. |
+| Model | `import_agent_model` imports a self-contained GLB, retaining supported materials, textures, rigs and animation data. |
+| Model package | `import_agent_model_package` imports glTF/OBJ with explicit dependencies, embedded-texture FBX or mesh PLY. |
+| Point cloud | `import_agent_splat` imports SPZ v2/v3, Gaussian PLY or `.splat` as approximate colored points. |
+| Audio or video | `import_agent_media` adds WAV, MP3, OGG, MP4 or WebM to explicitly chosen sequencer channels and frames. |
 
-The [Blender Extensions terms](https://extensions.blender.org/terms-of-service/)
-restrict extensions whose functionality depends on external registration, keys
-or payments, including access to external services. Scenario requires an account
-and API credentials, so this extension is distributed through its own repository
-at `https://blender.scenario.com/repo/index.json`, with each release's ZIP also
-attached to its GitHub release.
-Its manifest declares the permissions it uses and their reasons.
+Material images, environments and model textures are packed into the saved
+project. Audio/video uses retained external files; keep those files with the
+project when sharing or moving it. Material and environment tools also provide
+guarded restoration during the current session. See the [user guide](docs/USER_GUIDE.md)
+for limits and examples. The assistant needs a suitable generation tool for
+each requested asset; image generation alone does not provide all asset types.
 
-## Quick start
+Ask the assistant to save assets you want to reuse with `save_agent_result`.
+The local library retains verified copies and descriptions independently of the
+inbox and chat. The assistant can discover them with `list_agent_results`, inspect
+their details or image previews, then prepare their files for a new import.
+Reuse requires choosing a destination in the current project.
 
-In the 3D viewport, press **N** and open **Scenario**, or use the Scenario button
-in the viewport header. Pick a lane and model, enter a prompt, add any required
-reference and inspect the estimate before Generate. Results appear in Generations
-and your Output Folder, with actions for viewing or importing supported media.
-The [user guide](docs/USER_GUIDE.md) describes each lane and its controls.
+## Local Blender control
 
-## Features
+Connected assistants can inspect objects and datablocks, change selection and
+the timeline, build a camera path, and capture a viewport or quick camera still.
+Captures require Blender's graphical interface. Arbitrary Python execution is
+separately controlled by **Allow connected assistants to run Python** and is off by
+default. The image handoff and dedicated scene tools work with that option off.
 
-- [Image](docs/USER_GUIDE.md#image): generate from text or reference images and use results as textures or references.
-- [Video](docs/USER_GUIDE.md#video): generate from prompts, images or scene playblasts.
-- [3D](docs/USER_GUIDE.md#3d): generate meshes, run provider edit tasks on a selected mesh and [apply a saved edit](docs/USER_GUIDE.md#apply-a-saved-mesh-edit) back to it.
-- [Materials](docs/USER_GUIDE.md#materials): generate saved PBR texture sets and apply them explicitly to a chosen mesh material slot.
-- [Audio](docs/USER_GUIDE.md#audio): generate speech, music or sound effects and add results to the sequencer.
-- [Render Image](docs/USER_GUIDE.md#render-image): use a scene capture and look references to produce a still.
-- [Render Video](docs/USER_GUIDE.md#render-video): work with timeline captures, a camera path planner and style references.
-- [Blockout](docs/USER_GUIDE.md#blockout): turn a scene description into a greybox layout, then refine or rebuild it.
-- [Environment](docs/USER_GUIDE.md#environment): generate 360 panoramas, HDRIs and upscales, then apply them to the scene World.
-- [Prompt tools and model picker](docs/USER_GUIDE.md#the-form): browse models and prepare prompts; prompt helpers can spend credits.
-- [Floating composer](docs/USER_GUIDE.md#the-floating-composer): access the current lane from the viewport.
-- [Generations](docs/USER_GUIDE.md#generations): inspect local results and available project history.
-- [Expanded Studio view](docs/USER_GUIDE.md#expanded-studio-view): run workflows and browse or organize Library assets.
-- [Film tasks](docs/USER_GUIDE.md#film-tasks): turn a JSON recipe into shots, a timeline, a review scene and an exported video.
+For scene design, the assistant can turn a description into a categorized
+primitive blockout, refine its saved recipe and rebuild its owned collection.
+Manual edits and unrelated objects are protected by revision and content checks.
+For mesh edits, it exports a named supported static mesh, works on that snapshot
+with its own tools, and applies a returned GLB with an explicit remesh, UV,
+retexture, parts or rig policy. The original target must remain unchanged.
+An object-local export supports mirrored sources. Reference-only exports can
+snapshot evaluated meshes with modifiers or deformation, including up to 64
+explicit meshes in world coordinates. Those snapshots cannot authorize an edit.
 
-## Agents (MCP)
+Quick stills support grey clay shading. `snapshot_render_result` preserves the
+existing Render Result as a verified PNG reference without starting a new render.
 
-The local `scenario-blender` server connects an authorized agent to the open
-scene and generation into it. The hosted [mcp.scenario.com](https://mcp.scenario.com)
-server provides platform-wide collections, training, workflows and usage without
-requiring Blender; connect both when needed.
+`capture_agent_animation` creates a silent MP4 camera or viewport reference,
+up to 20 seconds and 1920×1080, with optional grey clay shading. It restores
+camera, frame and capture settings afterward. The assistant can use that clip
+with its own video tools and import the result back into the timeline.
 
-The default local endpoint is `http://127.0.0.1:9876/mcp`. **Agents (MCP)** shows
-its status and bearer token and provides client setup for Claude Code, Cursor,
-Claude Desktop and Codex under the name `scenario-blender`. Treat the token and
-copied setup as secrets. Connected agents can read the scene and request paid
-work; arbitrary Python execution is a separate opt-in permission, disabled by default.
-
-Use the [MCP reference](docs/MCP.md) for complete client setup, tool contracts,
-security controls and headless configuration. The headless entry point is:
+For an isolated headless session, the extension registers:
 
 ```sh
-blender --background scene.blend --command scenario_blender
+blender --background --online-mode --command open_studio --port 9876
 ```
 
-### Authentication
+The headless server uses local authentication and writes its connection details
+to a private file. Viewport screenshots and quick OpenGL captures require the
+GUI. See [MCP setup and security](docs/MCP.md) for connection details and limits.
 
-Scenario API requests use an API key and secret. Saved Blender credentials are
-the default; **Credentials > Environment** explicitly selects an environment
-pair instead. The extension does not provide browser OAuth sign-in. The hosted
-Scenario MCP service has its own authentication, described in its linked docs.
-Blender stores saved credentials in its preferences, not an OS keychain.
+## Privacy and help
 
-## What leaves your machine
+Asset import reads from the extension's local inbox. A connected assistant can
+receive the scene data and captures requested through MCP. Generation performed
+by the assistant follows its own
+service policies. Keep the local token and connection file private.
 
-Cost previews send prompts and parameters to `https://api.cloud.scenario.com`
-while you edit, before Generate. Upload reference sends files, scene captures or
-exported meshes; generation and prompt tools spend credits. Catalogs, thumbnails
-and result previews load from Scenario; cloud history and Library assets load
-when requested. Saved keys, prompts, job state and media remain in Blender
-preferences, extension storage or output files. Connected local agents can read
-your scene and request paid work using your account. Read
-[Privacy and data handling](docs/PRIVACY.md) for destinations, storage, clipboard
-use and current limits.
+- [User guide](docs/USER_GUIDE.md): installation, asset handoff and troubleshooting.
+- [MCP reference](docs/MCP.md): local tool contracts and client setup.
+- [Privacy](docs/PRIVACY.md): data handling and Python permissions.
+- [Support](SUPPORT.md): fork issues and useful diagnostic information.
+- [Documentation index](docs/index.md): current guides and inherited source references.
 
-## Documentation
-
-Start with the [user guide](docs/USER_GUIDE.md), [known limitations](docs/KNOWN_LIMITATIONS.md)
-and [changelog](CHANGELOG.md). The [documentation index](docs/index.md) links
-architecture, integration status and developer references. The public HTML handbook address is
-[blender.scenario.com](https://blender.scenario.com/). Build HTML from the maintained
-Markdown with `make docs`; see [documentation builds](CONTRIBUTING.md#documentation-builds)
-for website and single-file outputs.
-
-## Staying up to date
-
-Follow [releases](https://github.com/scenario-labs/blender-plugin/releases), or
-choose **Watch > Custom > Releases** on GitHub for release notifications.
-
-## Support
-
-Use [Support](SUPPORT.md) for bug reports, feature requests and the information
-to include. Account, billing and API-key questions go to support@scenario.com
-or Scenario's in-app support. Never post credentials, bearer tokens or signed
-asset URLs in a public issue.
-
-Report vulnerabilities privately through **Security > Report a vulnerability**
-or the contact in [Security](SECURITY.md); do not open a public issue.
+Install updates from this fork's release ZIPs. Historical upstream guides and
+screenshots describe a different generation workflow and do not establish what
+this assistant-only build supports.
 
 ## Development
 
-Read [Contributing](CONTRIBUTING.md) for the pinned environment, local checks,
-portable tools and isolated Blender test loop. [AGENTS.md](AGENTS.md) is the
-canonical conventions contract for humans and agents; [agent tools](docs/development/agents.md)
-describes the shared commands. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
-Optional local hooks are installed with `make hooks`; see [installation and scope](CONTRIBUTING.md#optional-local-hooks).
-Offline tests need no Scenario account. Live smoke tests spend credits and
-require explicit authorization; they are outside the default checks.
-
-Discover repository maintenance commands with
-`uv run --locked --no-env-file python -m tools --help` from the repository root.
-The `assets check` and `assets optimize` commands share the
-[documentation image policy](CONTRIBUTING.md#screenshots) with the unit suite.
-
-Native CI covers Blender 5.0.1, 5.1.2 and 5.2.1 on Linux and Windows for pull
-requests. A separate informational workflow schedules Blender 5.1.2 checks on
-macOS Apple silicon and Windows x64 weekly; see [matrix maintenance](CONTRIBUTING.md#bumping-the-blender-matrix)
-for failure tracking.
-
-## Sibling integrations
-
-Scenario for Blender is one of several Scenario integrations. The plugins share
-the Scenario name, the id `scenario` inside each host's namespace and the support
-channel (support@scenario.com), not necessarily the same licence.
-
-- [Scenario for Unity](https://github.com/scenario-labs/Scenario-Unity), Unity package `com.scenarioinc.scenario`. Scenario for Unity is MIT-licensed; this extension is GPL-3.0-or-later because Blender add-ons that import bpy must be GPL-compatible.
-- [Scenario skills for agents](https://github.com/scenario-labs/skills) (MIT).
-- The [Scenario MCP server](https://mcp.scenario.com) provides Scenario tools outside Blender. The [MCP guide](docs/MCP.md#local-server-and-mcpscenariocom) explains how it relates to this extension's local server.
+Read [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and the
+[validation guide](docs/development/validation.md). Follow the current
+assistant-only scope when retained upstream guidance describes service
+integration. Use the pinned uv version and locked environment. Package through
+the repository tools so required dependencies and notices are included. Native
+tests install the actual ZIP into an isolated profile.
 
 ## Licence
 
@@ -219,9 +153,7 @@ and the extension ZIP includes the same GPL text. Bundled dependencies, adopted
 sources and assets retain their original licences and notices; see the
 [SDK bundle](docs/SDK_BUNDLE.md) and [source adoption](docs/STUDIO_ADOPTION.md).
 The [bundled icon notice](scenario/icons/README.md) records the generator, the
-font option and the icons' first-party design origin. Scenario Inc. made the
-exploration gallery covers (`docs/images/exploration-*.png`) and also publishes
-them at [www.scenario.com/explorations](https://www.scenario.com/explorations/).
+font option and the icons' first-party design origin.
 
 [Blender's licence guidance](https://www.blender.org/about/license/) requires a
 GPL-compatible licence for published add-ons using its Python API. The

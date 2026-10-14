@@ -188,14 +188,14 @@ class SceneToolTests(unittest.TestCase):
         with file_marks(self) as marks:
             self.tools.select_objects({"names": ["Crate"]})
         self.assertTrue(self.crate.select_get())
-        self.assertEqual(marks, ["Scenario MCP selection"])
+        self.assertEqual(marks, ["Open Studio MCP selection"])
         self.assertTrue(bpy.data.is_dirty)
 
     def test_frame_marks_the_file(self):
         with file_marks(self) as marks:
             self.tools.set_frame({"frame": 42})
         self.assertEqual(bpy.context.scene.frame_current, 42)
-        self.assertEqual(marks, ["Scenario MCP frame"])
+        self.assertEqual(marks, ["Open Studio MCP frame"])
         self.assertTrue(bpy.data.is_dirty)
 
     def test_python_marks_the_file(self):
@@ -203,7 +203,7 @@ class SceneToolTests(unittest.TestCase):
             result = self.tools.execute_python({"code": "bpy.data.objects['Crate'].name = 'Box'"})
         self.assertNotIn("error", result)
         self.assertIn("Box", bpy.data.objects)
-        self.assertEqual(marks, ["Scenario MCP Python"])
+        self.assertEqual(marks, ["Open Studio MCP Python"])
         self.assertTrue(bpy.data.is_dirty)
 
     def test_camera_path_marks_the_file(self):
@@ -211,7 +211,7 @@ class SceneToolTests(unittest.TestCase):
         with file_marks(self) as marks:
             result = self.tools.camera_path({"waypoints": waypoints, "duration": 2})
         self.assertEqual(bpy.context.scene.camera.name, result["camera"])
-        self.assertEqual(marks, ["Scenario camera path"])
+        self.assertEqual(marks, ["Open Studio camera path"])
         self.assertTrue(bpy.data.is_dirty)
 
     def test_refused_arguments_leave_the_file_clean(self):
@@ -248,7 +248,7 @@ class SceneToolTests(unittest.TestCase):
         with file_marks(self) as marks:
             self.tools.set_frame({"frame": scene.frame_current})
         self.assertEqual(scene.frame_subframe, 0.0)
-        self.assertEqual(marks, ["Scenario MCP frame"])
+        self.assertEqual(marks, ["Open Studio MCP frame"])
         self.assertTrue(bpy.data.is_dirty)
 
     def test_a_failure_after_the_path_changed_still_marks_it(self):
@@ -261,7 +261,7 @@ class SceneToolTests(unittest.TestCase):
         ):
             self.tools.camera_path({"waypoints": waypoints})
         self.assertEqual(len(planner.marker_objects(bpy.context.scene)), 2)
-        self.assertEqual(marks, ["Scenario camera path"])
+        self.assertEqual(marks, ["Open Studio camera path"])
         self.assertTrue(bpy.data.is_dirty)
 
 

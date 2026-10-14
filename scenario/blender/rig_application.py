@@ -141,7 +141,13 @@ def apply_skin(target, primary, objects, mapping, *, keep_original):
     """Retain imported rig hierarchy; keep source geometry, materials and object context."""
     rig, imported_modifier, names, weights = validate_skin(target, primary, objects, mapping)
     staged = _stage_weights(target, names, weights)
-    receipt = mesh._replace_mesh(target.scene, target.obj, staged, keep_original=keep_original)
+    receipt = mesh._replace_mesh(
+        target.scene,
+        target.obj,
+        staged,
+        keep_original=keep_original,
+        allowed_mesh_properties=target.allowed_mesh_properties,
+    )
     modifier = None
     try:
         # Blender owns vertex-group names on the mesh; the staged copy already

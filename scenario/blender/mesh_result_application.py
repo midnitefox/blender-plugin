@@ -161,6 +161,7 @@ def apply_saved_mesh(target, item, path, *, policy, result_to_source, keep_origi
                     policy="REMESH" if policy == "PARTS" else policy,
                     result_to_source=local_mapping,
                     keep_original=keep_original,
+                    allowed_mesh_properties=target.allowed_mesh_properties,
                 )
             if parts:
                 _publish_parts(target, parts)

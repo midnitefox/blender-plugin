@@ -10,8 +10,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 START, END = "<!-- tools:start -->", "<!-- tools:end -->"
 GROUPS = (
+    (
+        "Assistant image tools",
+        "scenario/mcp/tools_agent.py",
+    ),
+    ("Assistant materials and environments", "scenario/mcp/tools_agent_materials.py"),
+    ("Saved local results", "scenario/mcp/tools_agent_results.py"),
+    ("Assistant audio and video", "scenario/mcp/tools_agent_media.py"),
+    ("Assistant models", "scenario/mcp/tools_agent_models.py"),
+    ("Model packages and point clouds", "scenario/mcp/tools_agent_packages.py"),
+    ("Mesh editing", "scenario/mcp/tools_agent_mesh.py"),
+    ("Scene blockout", "scenario/mcp/tools_agent_blockout.py"),
+    ("Animation captures", "scenario/mcp/tools_agent_capture.py"),
+    ("Film inspection", "scenario/mcp/tools_agent_film.py"),
+    ("Film scenes and timelines", "scenario/mcp/tools_agent_film_scene.py"),
+    ("Film review", "scenario/mcp/tools_agent_film_review.py"),
+    ("Film export and portable projects", "scenario/mcp/tools_agent_film_export.py"),
     ("Scene tools (run on Blender's main thread)", "scenario/mcp/tools_blender.py"),
-    ("Scenario tools", "scenario/mcp/tools_scenario.py"),
 )
 
 
@@ -65,6 +80,8 @@ def parse_specs(path):
             raise ValueError("SPECS must contain ToolSpec calls")
         name, description = (ast.literal_eval(arg) for arg in call.args[:2])
         schema = call.args[2]
+        if isinstance(schema, ast.Name):
+            schema = assignments.get(schema.id)
         if (
             not isinstance(schema, ast.Call)
             or not isinstance(schema.func, ast.Name)
@@ -123,8 +140,6 @@ def render(groups):
                 notes.append("destructive annotation")
             if re.search(r"\bGUI\b", description) or "Do not use in background mode" in description:
                 notes.append("GUI required")
-            if "spends the user's credits" in description:
-                notes.append("spends credits")
             if "Disabled by default" in description:
                 notes.append("Python preference gate; off by default")
             lines.append(

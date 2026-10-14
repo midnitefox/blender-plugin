@@ -1,95 +1,24 @@
 # SPDX-FileCopyrightText: 2026 Scenario Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Add-on preferences: credentials, output folder, composer, MCP."""
-
-import textwrap
+"""Preferences for the local assistant connection and its saved output."""
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, IntProperty
 
-from .blender import updates
-
-PORTAL_KEYS_URL = "https://app.scenario.com/team"
-
-
-def credentials_changed(self, context):
-    from .blender import runtime
-
-    runtime.state.account_label = ""
-    runtime.sync_catalog_context()
+from .blender import provider_setup, updates
 
 
 class ScenarioPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
-    credential_source: EnumProperty(
-        name="Credentials",
-        items=[
-            ("PREFERENCES", "Saved in Blender", "Use the API key and secret entered below"),
-            (
-                "ENVIRONMENT",
-                "Environment",
-                "Use SCENARIO_API_KEY and SCENARIO_API_SECRET from Blender's launch environment",
-            ),
-        ],
-        default="PREFERENCES",
-        update=credentials_changed,
-    )
-    api_key: StringProperty(
-        update=credentials_changed,
-        name="API Key",
-        subtype="PASSWORD",
-        description="Scenario API key (Project or Team scoped). Created in the Scenario portal",
-    )
-    api_secret: StringProperty(
-        update=credentials_changed,
-        name="API Secret",
-        subtype="PASSWORD",
-        description="Shown once when the key is created",
-    )
-    project_id: StringProperty(
-        name="Project ID (optional)",
-        description="Leave blank to use the API key's default scope; otherwise use this project",
-        default="",
-        update=credentials_changed,
-    )
-    output_dir: StringProperty(
-        name="Output Folder",
-        subtype="DIR_PATH",
-        default="~/Downloads/Scenario",
-        description="Generated files are saved here, one subfolder per kind",
-    )
-    composer_enabled: BoolProperty(
-        name="Floating composer in the viewport",
-        default=True,
-        update=lambda self, context: __import__(
-            __package__ + ".blender.composer", fromlist=["set_enabled"]
-        ).set_enabled(self.composer_enabled),
-    )
-    composer_offset_x: FloatProperty(
-        name="Composer offset X",
-        default=0.0,
-        description="Where the floating composer was dragged to, from its default bottom-centre spot (pixels)",
-    )
-    composer_offset_y: FloatProperty(
-        name="Composer offset Y",
-        default=0.0,
-        description="Where the floating composer was dragged to, from its default bottom-centre spot (pixels)",
-    )
-    composer_width: IntProperty(
-        name="Composer width",
-        default=0,
-        min=0,
-        description="Width of the expanded composer in pixels (0 = default)",
-    )
-    mcp_port: IntProperty(name="MCP Port", default=9876, min=1024, max=65535)
+    mcp_port: IntProperty(name="Local connection port", default=9876, min=1024, max=65535)
     mcp_allow_python: BoolProperty(
-        name="Allow connected agents to run Python",
+        name="Allow connected assistants to run Python",
         default=False,
-        description="Off by default: connected agents keep the read and scene tools; turn on only to let them run arbitrary bpy code in this Blender",
+        description="Off by default: assistants can use the scene tools. Enable only to allow arbitrary Blender Python commands",
     )
     log_level: EnumProperty(
-        name="Log Level",
+        name="Log level",
         items=[("INFO", "Info", ""), ("DEBUG", "Debug", "")],
         default="INFO",
         update=lambda self, context: __import__(
@@ -98,49 +27,10 @@ class ScenarioPreferences(bpy.types.AddonPreferences):
     )
 
     def draw(self, context):
-        from .blender import runtime
-
         layout = self.layout
+        provider_setup.draw_provider_setup(layout, context, self)
         box = layout.box()
-        box.label(text="Account", icon="USER")
-        box.prop(self, "credential_source")
-        if self.credential_source == "PREFERENCES":
-            box.prop(self, "api_key")
-            box.prop(self, "api_secret")
-            box.label(text="Saved as plain text in userpref.blend", icon="INFO")
-            box.label(text="Select Environment to use SCENARIO_API_KEY + SCENARIO_API_SECRET")
-        else:
-            box.label(text="SCENARIO_API_KEY + SCENARIO_API_SECRET", icon="CONSOLE")
-            box.label(text="From the environment used to launch Blender")
-        box.prop(self, "project_id")
-        box.label(text="Blank uses the API key's default scope", icon="INFO")
-        if not runtime.credentials().valid:
-            box.label(text="The selected source needs both a key and a secret", icon="ERROR")
-        row = box.row(align=True)
-        row.operator(
-            "scenario.open_url", text="Create a key in the portal", icon="URL"
-        ).url = PORTAL_KEYS_URL
-        row.operator("scenario.test_connection", text="Test connection", icon="CHECKMARK")
-        if runtime.state.account_label:
-            # Labels clip instead of wrapping; permission guidance must stay readable.
-            icon = "ERROR" if runtime.state.connection_status == "error" else "INFO"
-            for index, line in enumerate(textwrap.wrap(runtime.state.account_label, 70)):
-                box.label(text=line, icon=icon if index == 0 else "NONE")
-        if not runtime.online():
-            box.label(
-                text="Allow Online Access is off in Blender's System preferences", icon="ERROR"
-            )
-        layout.prop(self, "output_dir")
-        layout.prop(self, "composer_enabled")
-        row = layout.row(align=True)
-        row.enabled = self.composer_enabled
-        row.label(text="Composer placement", icon="ARROW_LEFTRIGHT")
-        row.prop(self, "composer_offset_x", text="X")
-        row.prop(self, "composer_offset_y", text="Y")
-        row.prop(self, "composer_width", text="Width")
-        row.operator("scenario.composer_reset_layout", text="", icon="LOOP_BACK")
-        box = layout.box()
-        box.label(text="MCP server (agents)", icon="PLUGIN")
+        box.label(text="Local assistant connection", icon="PLUGIN")
         box.prop(self, "mcp_port")
         box.prop(self, "mcp_allow_python")
         layout.prop(self, "log_level")

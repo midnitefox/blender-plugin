@@ -221,7 +221,7 @@ exact quote or discard it before requesting another. Pending preparation appears
 as `quoting` or `binding`; saved upload associations remain inspectable as `bound`.
 Inspection never requests a new price, submits, or applies a result, and it omits
 quotes whose recipe, scene revision or credential context changed.
-See [MCP contracts](MCP.md#local-server-and-mcpscenariocom).
+See [MCP contracts](MCP.md#historical-upstream-reference).
 
 `FilmJobs` owns bounded presentation handles, not an executor or another store.
 Approved tasks enter the existing `ModelJobs` polling/download path. Results stay
@@ -914,7 +914,7 @@ timing, counts, size and master inclusion for explicit approval, then call
 `build_film_review`. The status tool also cancels, discards, retries a known
 receipt or dismisses an inspected uncertain review (`inspected: true`). Native and
 MCP controls share the same handles: an MCP-prepared review can be built natively
-and the reverse. See [MCP review commands](MCP.md#film-review-commands).
+and the reverse. See [MCP review commands](MCP.md#historical-upstream-reference).
 
 Restart drops review handles and pending receipt authority, as described above;
 saved jobs keep their durable claims for inspection. Undo after a build removes
@@ -1168,7 +1168,7 @@ verbatim. Native file browser choices are limited only by the session policy
 above. Native and MCP controls share the same handles, but agent render and
 copy approvals recheck the Output Folder: an agent cannot approve a file chosen
 natively elsewhere, which stays for native confirmation. See
-[MCP export commands](MCP.md#film-export-commands).
+[MCP export commands](MCP.md#historical-upstream-reference).
 
 [Installed tests](../tests/blender/test_film_export_controls.py) run one real child
 export; the others replace the child with a fast handoff while the real publish
@@ -1297,7 +1297,7 @@ export's agent folder policy. Show the returned destination and contents, then
 call `export_film_case_study(review_id, approved_destination)` with that
 destination verbatim. Poll `film_case_study_review`; it also cancels, discards,
 and after a failed save uses `prepare_republish` and `republish`. See
-[MCP case-study commands](MCP.md#film-case-study-commands).
+[MCP case-study commands](MCP.md#historical-upstream-reference).
 
 [Unit](../tests/unit/test_local_case_study.py) and
 [installed](../tests/blender/test_film_case_study.py) tests build a real bundle,

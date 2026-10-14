@@ -30,7 +30,7 @@ class CredentialTests(unittest.TestCase):
                 self.assertEqual(runtime.credentials().secret, "launch-secret")
                 del os.environ["SCENARIO_API_SECRET"]
                 self.assertFalse(runtime.credentials().valid)
-                with self.assertRaisesRegex(Exception, "selected credential source"):
+                with self.assertRaisesRegex(Exception, "selected connection"):
                     runtime.ensure_catalog()
                 with patch.object(runtime, "prefs", return_value=None):
                     self.assertFalse(runtime.credentials().valid)

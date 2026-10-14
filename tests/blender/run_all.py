@@ -21,89 +21,47 @@ sys.path.insert(0, str(HERE))
 
 from blender_env import inspect_zip, sha256, verify_installed  # noqa: E402
 
+# The shipped assistant-only runtime. Inherited service tests remain available
+# through explicit --test selection or --suite all for historical maintenance.
 BASELINE = (
-    "test_upload_transfers",
-    "test_upload_store",
-    "test_credentials",
-    "test_sdk_connection",
-    "test_result_commands",
-    "test_upload_commands",
+    "test_provider_setup",
+    "test_assistant_mode",
+    "test_agent_artifacts",
+    "test_agent_results",
+    "test_agent_still_inputs",
+    "test_agent_materials",
+    "test_agent_media",
+    "test_agent_models",
+    "test_agent_packages",
+    "test_agent_mesh",
+    "test_agent_blockout",
+    "test_agent_capture",
+    "test_agent_film",
+    "test_agent_film_scene",
+    "test_agent_film_review",
+    "test_agent_film_export",
     "test_register",
     "test_updates",
-    "test_desktop_open",
-    "test_icons",
-    "test_model_picker",
-    "test_generation",
-    "test_result_media",
-    "test_result_preview_tiles",
-    "test_mcp_result_previews",
-    "test_apply_image",
-    "test_apply_material",
-    "test_apply_3d",
-    "test_model_packages",
-    "test_splat_snapshots",
-    "test_splat_application",
-    "test_apply_video",
-    "test_mesh_application",
+    "test_mcp_panel",
     "test_mcp_server",
-    "test_mcp_contracts",
-    "test_mcp_wait",
-    "test_mcp_security",
+    "test_mcp_security.McpSecurityTests",
     "test_mcp_cli",
-    "test_installed_contract",
-    "test_helpers",
-    "test_history",
-    "test_sdk_history",
-    "test_render_lanes",
-    "test_prompt_tools",
-    "test_blockout",
-    "test_blockout_jobs",
-    "test_offline_runtime",
-    "test_sdk_bundle",
-    "test_sdk_estimates",
-    "test_job_store",
-    "test_model_defaults",
-    "test_trained_models",
-    "test_trained_section",
-    "test_mcp_trained_models",
-    "test_result_transfers",
     "test_local_capture",
-    "test_job_session",
-    "test_preview_decode",
-    # The file-modified mark itself; its other paths need the full suite's fixtures.
-    "test_file_modified.FileStateTests",
+    "test_shot_planner",
     "test_file_modified.SceneToolTests",
-    "test_organization_session",
-    "test_asset_organization",
-    "test_session_results",
-    "test_result_previews",
-    "test_waveform_worker",
-    "test_audio_player",
-    "test_session_uploads",
-    "test_film_capture",
-    "test_film_composition_controls",
-    "test_film_finishing",
-    "test_film_review",
-    "test_film_review_preparation",
-    "test_film_review_controls",
-    "test_film_export_primitive",
-    "test_film_export_controls",
-    "test_film_case_study",
-    "test_reference_uploads",
-    "test_reference_form",
-    "test_background_removal",
-    "test_sdk_uploads",
-    "test_model_payload_validation",
-    "test_world_application",
-    "test_workflow_commands",
-    "test_studio_view",
-    "test_result_actions",
-    "test_workflow_controls",
-    "test_asset_library",
-    "test_library_view",
-    "test_library_organization",
-    "test_workflow_references",
-    "test_workflow_uploads",
+    "test_file_modified.FileStateTests.test_a_mark_records_one_undo_step_that_marks_the_file",
+    "test_file_modified.FileStateTests.test_a_timer_context_without_a_window_marks_through_the_first_window",
+    "test_file_modified.FileStateTests.test_a_mark_during_a_stroke_waits_for_the_stroke_to_end",
+    "test_file_modified.FileStateTests.test_strokes_are_recognized_by_their_operator_family",
+    "test_file_modified.FileStateTests.test_reading_a_file_drops_a_waiting_mark",
+    "test_file_modified.FileStateTests.test_marks_are_refused_off_the_main_thread",
+    "test_desktop_open.DesktopOpenTests.test_local_folder_opens_through_the_filtered_launcher",
+    "test_desktop_open.DesktopOpenTests.test_preference_links_open_through_the_filtered_launcher",
+    "test_desktop_open.DesktopOpenTests.test_the_started_opener_gets_no_credentials_python_start_up_or_proxies",
+    "test_desktop_open.DesktopOpenTests.test_refusals_are_reported_before_anything_starts",
+    "test_desktop_open.DesktopOpenTests.test_a_missing_opener_is_reported",
+    "test_desktop_open.DesktopOpenTests.test_a_launcher_that_exits_with_an_error_is_reported_on_the_status_line",
+    "test_desktop_open.DesktopOpenTests.test_a_launcher_that_keeps_running_is_forgotten_without_a_report",
 )
 
 
@@ -186,6 +144,14 @@ def install_network_guard():
     return violations
 
 
+def load_suite(loader, suite_name, selected_tests):
+    if selected_tests:
+        return loader.loadTestsFromNames(selected_tests)
+    if suite_name == "all":
+        return loader.discover(str(HERE), pattern="test_*.py")
+    return loader.loadTestsFromNames(BASELINE)
+
+
 def main():
     # No real-profile opt-out: contributors should always use the runner.
     raw_profile = os.environ.get("BLENDER_USER_RESOURCES")
@@ -206,6 +172,7 @@ def main():
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--report", type=pathlib.Path, required=True)
     parser.add_argument("--suite", choices=("baseline", "all"), required=True)
+    parser.add_argument("--test", action="append", default=[])
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
     if args.zip.resolve().parent != profile.parent or sha256(args.zip) != args.sha256:
         raise RuntimeError("Candidate ZIP identity mismatch")
@@ -229,10 +196,7 @@ def main():
     helpers.configure(package, installed, profile)
     print(f"Verified installed package: {package}; ZIP SHA-256: {args.sha256}", flush=True)
     loader = unittest.TestLoader()
-    if args.suite == "all":
-        suite = loader.discover(str(HERE), pattern="test_*.py")
-    else:
-        suite = loader.loadTestsFromNames(BASELINE)
+    suite = load_suite(loader, args.suite, args.test)
     result = unittest.TextTestRunner(verbosity=2, resultclass=PromptResult).run(suite)
     # Byte equality and module origins must still hold after tests execute.
     if sha256(args.zip) != args.sha256:
@@ -249,10 +213,12 @@ def main():
     import addon_utils
 
     addon_utils.disable(package, default_set=True)
-    if package in bpy.context.preferences.addons or hasattr(bpy.types.Scene, "scenario"):
+    if package in bpy.context.preferences.addons or hasattr(bpy.types.Scene, "scenario_shot"):
         raise RuntimeError("Extension disable left registration state behind")
     addon_utils.enable(package, default_set=True)
-    if package not in bpy.context.preferences.addons or not hasattr(bpy.types.Scene, "scenario"):
+    if package not in bpy.context.preferences.addons or not hasattr(
+        bpy.types.Scene, "scenario_shot"
+    ):
         raise RuntimeError("Extension re-enable failed")
     addon_utils.disable(package, default_set=True)
     success = result.wasSuccessful() and not violations and result.testsRun > 0
@@ -260,7 +226,8 @@ def main():
         json.dumps(
             {
                 "success": success,
-                "suite": args.suite,
+                "suite": "focused" if args.test else args.suite,
+                "selected_tests": args.test,
                 "tests_run": result.testsRun,
                 "failures": len(result.failures),
                 "errors": len(result.errors),

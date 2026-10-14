@@ -24,6 +24,7 @@ from helpers import addon_name, submodule
 SECRETS = {
     "SCENARIO_API_KEY": "launch-key",
     "SCENARIO_API_SECRET": "fixture",
+    "OPEN_STUDIO_TOKEN": "assistant-fixture",
     "PYTHONPATH": "start-up",
     "PYTHONHOME": "home",
     "HTTPS_PROXY": "http://proxy.invalid",
@@ -117,10 +118,10 @@ class DesktopOpenTests(unittest.TestCase):
             elif button.idname == "scenario.open_url":
                 self.assertEqual(bpy.ops.scenario.open_url(url=button.url), {"FINISHED"})
 
-    def test_output_folder_opens_through_the_filtered_launcher(self):
+    def test_local_folder_opens_through_the_filtered_launcher(self):
         self.record()
-        self.assertEqual(bpy.ops.scenario.open_output_folder(), {"FINISHED"})
-        output = os.path.normpath(str(self.runtime.paths().output_dir))
+        output = os.path.normpath(str(self.root))
+        self.assertEqual(bpy.ops.scenario.open_path(filepath=output), {"FINISHED"})
         self.assertEqual(self.opened, [("path", output)])
         self.assertTrue(Path(output).is_dir())
 
@@ -194,16 +195,14 @@ class DesktopOpenTests(unittest.TestCase):
                 self.assertEqual(self.opened, [("path", os.path.normpath(str(self.root)))])
 
     def test_preference_links_open_through_the_filtered_launcher(self):
-        prefs_module = submodule("prefs")
         updates = submodule("blender.updates")
         preferences = bpy.context.preferences.addons[addon_name()].preferences
         layout = Layout()
-        # The preferences draw the portal link, then the update controls' links.
+        # The assistant preferences expose only the fork's guide and releases.
         type(preferences).draw(Preferences(preferences, layout), bpy.context)
         links = [
-            ("Create a key in the portal", prefs_module.PORTAL_KEYS_URL),
-            ("Update guide", updates.GUIDE_URL + "#updates"),
-            ("Release ZIPs", updates.RELEASES_URL),
+            ("Open Studio releases", updates.RELEASES_URL),
+            ("Setup guide", updates.GUIDE_URL),
         ]
         self.assertEqual(layout.opens(), links)
         self.assertEqual(layout.blender_openers(), [])
@@ -243,7 +242,7 @@ class DesktopOpenTests(unittest.TestCase):
                 [
                     key
                     for key in env
-                    if key.upper().startswith(("SCENARIO_", "PYTHON"))
+                    if key.upper().startswith(("SCENARIO_", "OPEN_STUDIO_", "PYTHON"))
                     or key.upper() in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"}
                 ]
             )
@@ -272,8 +271,6 @@ class DesktopOpenTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "could not open this file or folder"):
                 bpy.ops.scenario.open_path(filepath=str(self.root))
-            with self.assertRaisesRegex(RuntimeError, "could not open this file or folder"):
-                bpy.ops.scenario.open_output_folder()
             with self.assertRaisesRegex(RuntimeError, "could not open this link"):
                 bpy.ops.scenario.open_url(url="https://app.scenario.com/team")
         self.assertEqual(self.desktop._launchers, [])

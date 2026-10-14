@@ -13,9 +13,9 @@ network_access = true
 
 # Enable after starting the extension's MCP server in an isolated Blender profile.
 # Supply the current session token through the environment of the Codex process.
-# Never put the token in this file. See AGENTS.md for paid-action authorization.
-[mcp_servers.scenario-blender]
+# Never put the token in this file. Prefer the copied stdio setup for normal use.
+[mcp_servers.open-studio]
 url = "http://127.0.0.1:9876/mcp"
-bearer_token_env_var = "SCENARIO_BLENDER_TOKEN"
+bearer_token_env_var = "OPEN_STUDIO_TOKEN"
 enabled = false
 required = false

@@ -1,4 +1,28 @@
-# Scenario for Blender: UI style guide
+# Open Studio for Blender: UI style guide
+
+## Current assistant UI
+
+Use the compact sidebar and Preferences setup implemented in
+[assistant_ui.py](../scenario/blender/assistant_ui.py) and
+[provider_setup.py](../scenario/blender/provider_setup.py). The latter retains
+its source filename but draws only assistant connection controls.
+
+The setup path is **Connect your assistant**, **Copy Codex setup**, and the
+alternative assistant snippets. Explain that the assistant creates assets with
+its own tools and Blender imports them. Keep the local connection status, image
+handoff and camera controls clear. Direct-provider choices, API-key fields,
+model selectors, credits and service onboarding are outside this fork's UI.
+
+Respect Blender's theme and UI scale, wrap helper text, and never change state
+inside `draw()`. Verify any changed controls in an isolated installed build,
+including native input, focus and viewport interaction where affected.
+
+## Historical upstream UI reference
+
+The remaining sections document retained upstream panels and interaction
+evidence. Those service panels, the composer and their account instructions are
+not registered in Open Studio. Use this material only when maintaining retained
+source; it does not establish this fork's current UI or test coverage.
 
 The N-panel is drawn with Blender's `UILayout`, so it wears the user's Blender theme (colours, corner radius, fonts). We cannot change those; what we control is structure, spacing, wording and icons. This guide keeps the whole plugin coherent. The floating composer is custom gpu/blf drawing and mirrors the same language.
 
@@ -138,7 +162,7 @@ A model-load error saved with the file is not drawn in the form, below Generate
 or in the composer note unless this session recorded it. With online access disabled, the form says so and offers no retry. An MCP call
 needing the description, such as `model_schema`, starts the next read, or joins the
 pending one, and waits for it off the main thread
-([MCP quote contract](MCP.md#model-quote-and-submission-contract)); a read that
+([MCP quote contract](MCP.md#historical-upstream-reference)); a read that
 fails again returns its new reason.
 
 ### Trained models in the picker

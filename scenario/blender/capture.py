@@ -44,6 +44,9 @@ class RenderSettings:
     camera_name: str
     media_type: str = ""
     frame_current: int = 1
+    frame_subframe: float = 0.0
+    color_depth: str = "8"
+    compression: int = 15
 
     @classmethod
     def snapshot(cls, scene):
@@ -66,6 +69,9 @@ class RenderSettings:
             scene.camera.name if scene.camera else "",
             getattr(r.image_settings, "media_type", ""),
             scene.frame_current,
+            scene.frame_subframe,
+            r.image_settings.color_depth,
+            r.image_settings.compression,
         )
 
     def restore(self, scene):
@@ -81,8 +87,10 @@ class RenderSettings:
             r.image_settings.file_format = self.file_format
         try:
             r.image_settings.color_mode = self.color_mode
+            r.image_settings.color_depth = self.color_depth
         except TypeError:
             pass
+        r.image_settings.compression = self.compression
         r.filepath, r.use_stamp = self.filepath, self.use_stamp
         scene.frame_start, scene.frame_end = self.frame_start, self.frame_end
         _set_preview_range(scene, self.use_preview_range)
@@ -94,8 +102,10 @@ class RenderSettings:
         r.film_transparent = self.film_transparent
         if self.camera_name and bpy.data.objects.get(self.camera_name) is not None:
             scene.camera = bpy.data.objects[self.camera_name]
-        if scene.frame_current != self.frame_current:
-            scene.frame_set(self.frame_current)
+        elif not self.camera_name:
+            scene.camera = None
+        if (scene.frame_current, scene.frame_subframe) != (self.frame_current, self.frame_subframe):
+            scene.frame_set(self.frame_current, subframe=self.frame_subframe)
 
 
 def _set_preview_range(scene, enabled):
@@ -148,13 +158,21 @@ class _CameraView:
     shows, which is why "Camera clip" came out as clay even with Grey clay capture off. Capturing the viewport in
     camera view keeps its shading (Material Preview, Rendered) and still frames exactly what the camera sees."""
 
-    def __init__(self, area):
+    def __init__(self, area, scene):
         self.space = area.spaces.active if area is not None else None
+        self.scene = scene
         self.saved = None
+        self.saved_camera = None
 
     def __enter__(self):
         r3d = getattr(self.space, "region_3d", None)
         if r3d is not None:
+            self.saved_camera = (self.space.use_local_camera, self.space.camera)
+            # A viewport-pinned camera otherwise overrides the requested scene camera.
+            # Set the local flag first: assigning space.camera while it is false
+            # also assigns the scene camera.
+            self.space.use_local_camera = True
+            self.space.camera = self.scene.camera
             self.saved = (
                 r3d.view_perspective,
                 r3d.view_matrix.copy(),
@@ -175,6 +193,9 @@ class _CameraView:
     def __exit__(self, *exc):
         r3d = getattr(self.space, "region_3d", None)
         if r3d is not None and self.saved is not None:
+            local, camera = self.saved_camera
+            self.space.camera = camera
+            self.space.use_local_camera = local
             perspective, matrix, distance, location, rotation, zoom, offset = self.saved
             r3d.view_perspective = perspective
             if perspective != "CAMERA":
@@ -200,7 +221,7 @@ def _default_runner(kind, context, scene):
             )
         else:
             # camera source: capture through the viewport in camera view so materials and lighting come along
-            with _CameraView(area):
+            with _CameraView(area, scene):
                 bpy.ops.render.opengl(
                     animation=(kind == "animation"),
                     view_context=True,
@@ -228,6 +249,9 @@ class _Overlays:
                     space.show_gizmo,
                     space.shading.type,
                     space.shading.color_type,
+                    tuple(space.shading.single_color),
+                    space.shading.light,
+                    space.shading.studio_light,
                 )
             )
             space.overlay.show_overlays = False
@@ -235,14 +259,22 @@ class _Overlays:
             if self.force_solid:
                 space.shading.type = "SOLID"
                 space.shading.color_type = "SINGLE"
+                space.shading.single_color = (0.8, 0.8, 0.8)
+                space.shading.light = "STUDIO"
+                space.shading.studio_light = "paint.sl"
         return self
 
     def __exit__(self, *exc):
-        for space, (overlays, gizmo, shading, color) in zip(self.spaces, self.saved, strict=False):
+        for space, (overlays, gizmo, shading, color, single, light, studio) in zip(
+            self.spaces, self.saved, strict=False
+        ):
             space.overlay.show_overlays = overlays
             space.show_gizmo = gizmo
             space.shading.type = shading
             space.shading.color_type = color
+            space.shading.single_color = single
+            space.shading.light = light
+            space.shading.studio_light = studio
         return False
 
 
@@ -276,6 +308,8 @@ def capture_still(
         r.resolution_percentage = 100
         set_image_output(r, "PNG")
         r.image_settings.color_mode = "RGB"
+        r.image_settings.color_depth = "8"
+        r.image_settings.compression = 15
         r.use_stamp = False
         r.filepath = str(path)
         with _Overlays(context, force_solid):

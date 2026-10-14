@@ -122,7 +122,7 @@ session. No job, upload or store schema change is involved, and no credits are
 spent. See [the command contract](../JOB_COORDINATOR.md#asset-organization-commands)
 and [session ownership](../BLENDER_JOB_CONTEXT.md#asset-organization-reviews).
 Local MCP tools prepare, apply and inspect these reviews; see
-[asset organization](../MCP.md#asset-organization). The native Library uses the
+[asset organization](../MCP.md#historical-upstream-reference). The native Library uses the
 same owner through the projection described below. Live evidence is in the
 [release record](../maintenance/release-acceptance.md#library-organization);
 Apply from the desktop dialog is in

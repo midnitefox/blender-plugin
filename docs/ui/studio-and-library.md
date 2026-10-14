@@ -339,7 +339,7 @@ is not applying. The card belongs to the application's job session, not to the
 popup: the maintenance pump advances it, so closing and reopening Studio during
 Apply keeps it. A credential, Project ID or file change retires the session,
 clears the view and discards its reviews; a write already sent keeps its effect.
-Native and [local MCP](../MCP.md#asset-organization) reviews share the same owner,
+Native and [local MCP](../MCP.md#historical-upstream-reference) reviews share the same owner,
 so only one change applies at a time and they share its 32-review bound. While
 an agent's change applies, a ready card says so; Apply stays offered but refuses
 with that reason and sends nothing. When unapplied agent reviews fill the bound,

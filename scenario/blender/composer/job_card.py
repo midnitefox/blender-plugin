@@ -45,7 +45,7 @@ def draw_job(layout, request_id):
 
 class SCENARIO_OT_composer_job_card(bpy.types.Operator):
     bl_idname = "scenario.composer_job_card"
-    bl_label = "Scenario job"
+    bl_label = "Open Studio job"
     bl_description = (
         "Inspect this job's status and its explicit result actions without generating again"
     )

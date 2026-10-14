@@ -1,11 +1,67 @@
 # Runtime map and integration status
 
-The extension package is [scenario/](../../scenario/). It uses the scoped SDK runtime for generation and recovery, alongside retained
-local helpers and separately tested application components.
+Open Studio is an assistant-only extension. Generation takes place in the
+connected assistant's tools; Blender accepts local assets and performs scene
+operations. The source package remains [scenario/](../../scenario/), while the
+installed extension id and headless command are `open_studio`.
 The supported minimum in the [manifest](../../scenario/blender_manifest.toml)
 is Blender 5.0; dependency and runtime acceptance have separate gates.
 
-## Active entry points
+## Current assistant entry points
+
+- [registry.py](../../scenario/blender/registry.py) registers the compact
+  assistant UI, connection setup, camera tools and local asset lifecycle hooks.
+  It does not register the upstream composer, model forms or cloud jobs.
+- [runtime.py](../../scenario/blender/runtime.py) owns local connection and
+  filesystem state. [prefs.py](../../scenario/prefs.py) stores the loopback port,
+  optional Python permission and logging level. No generation credentials are
+  part of this runtime.
+- [assistant_loop.py](../../scenario/blender/assistant_loop.py) processes local
+  MCP requests and pending file-modified marks on Blender's main thread.
+- [mcp_service.py](../../scenario/blender/mcp_service.py) builds the active tool
+  registry, manages authenticated loopback transport and writes a private
+  connection file for the bundled stdio client. The `open_studio` command
+  provides a blocking queue pump for background Blender.
+- [tools_agent.py](../../scenario/mcp/tools_agent.py) exposes the bounded inbox
+  and image handoff. Dedicated modules handle PBR maps, panoramic Worlds,
+  models, point clouds, media, mesh edits, blockouts, animated captures and film
+  scenes. Film builders use local recipes, persistent scene identities and
+  explicit inbox assets; they do not use retained service job/session wrappers.
+  [The current MCP reference](../MCP.md) is generated from that registry.
+- [tools_agent_results.py](../../scenario/mcp/tools_agent_results.py) exposes
+  explicit saved local bundles through [assistant_results.py](../../scenario/core/assistant_results.py).
+  File copying and digest verification run on the request thread. Main-thread
+  preview decoding uses temporary Blender data. Listings validate metadata;
+  inspection and preparation verify bytes before reuse. The library preserves
+  files and roles, with no scene targets, provider session or automatic application.
+- [assistant_film_export.py](../../scenario/blender/assistant_film_export.py)
+  owns local export/package operations. Main-thread preparation snapshots current
+  scene contents; offline workers render or copy/rewrite/reopen portable projects.
+  A registered timer or operation poll finalizes completed work. File load,
+  Undo/Redo and disable invalidate unpublished operations. Background hashing
+  binds the result digest to a prepared-file identity/size/time stamp; the main
+  thread rechecks that stamp and publishes without overwriting. Private staging
+  and these checks detect ordinary changes and replacements; they are not an
+  isolation boundary against a hostile process running as the same OS user.
+- [agent_artifacts.py](../../scenario/core/agent_artifacts.py) verifies bounded
+  local file snapshots. Image and supported model resources are packed;
+  audio/video remains in retained external files. Operations preserve unrelated
+  scene data and reject stale targets or protected edits.
+
+Retained SDK and service modules are not active registration dependencies.
+Reusing a local helper must not import those modules transitively. Native
+assistant tests check the registered tools and loaded modules in an isolated
+installed package. Existing-rig retargeting is unsupported. Actual generation
+coverage and quality depend on the connected assistant's available tools;
+asset import alone does not establish creative workflow parity.
+
+## Historical upstream implementation
+
+The remainder records the inherited service architecture for source maintenance.
+Its credentials, SDK sessions, service operations and release assumptions do not
+describe the active Open Studio build or authorize restoring service setup.
+
+### Historical entry points
 
 - **Registration** ([registry.py](../../scenario/blender/registry.py)): Registers
   properties, panels, operators, composer, pump and local server integration. The
@@ -84,12 +140,12 @@ for the open checks.
 | Worker ownership | [RuntimeState](../../scenario/blender/runtime.py) selects one active session; its [workers](../../scenario/core/jobs/workers.py) outlive panel closure. Retirement stops admission while old owners retain in-flight persistence and cleanup. | Retired owners cannot deliver into a replacement connection or scene; cleanup failures may retain ownership for retry. |
 | Origin and stale-result protection | [JobSession](../../scenario/blender/job_session.py) binds entry points to the selected credentials/project and captured scene/target. Restart recovery uses fresh context and destination approval. | Saved names or IDs cannot restore live scene authority; see the [context contract](../BLENDER_JOB_CONTEXT.md). |
 | Result downloads | [ModelJobs](../../scenario/blender/model_jobs.py) drives saved manifests, bounded transfers and explicit interrupted-download recovery for model lanes. [Transfers](../RESULT_TRANSFERS.md) retain verified receipts and configured storage hosts. | Only admitted Image jobs automatically apply supported images to their original scene; other model results need explicit destination approval. Unsupported formats and uncertain states remain saved for inspection. |
-| Result previews | [Result previews](../RESULT_PREVIEWS.md) give the selected [JobSession](../../scenario/blender/job_session.py) a main-thread scheduler and the [workers](../../scenario/core/jobs/workers.py)' dedicated preview lane. Native preview tiles, workflow review previews, waveforms, private player copies and local MCP [`inspect_result_previews`](../MCP.md#saved-result-previews) use that scheduler; the guide owns each source, cache and offline process. | Clip display is #445, and live thumbnail coverage is not established. Desktop checks of preview tiles, playback, waveforms and review previews continue in #440. |
+| Result previews | [Result previews](../RESULT_PREVIEWS.md) give the selected [JobSession](../../scenario/blender/job_session.py) a main-thread scheduler and the [workers](../../scenario/core/jobs/workers.py)' dedicated preview lane. Native preview tiles, workflow review previews, waveforms, private player copies and local MCP [`inspect_result_previews`](../MCP.md#historical-upstream-reference) use that scheduler; the guide owns each source, cache and offline process. | Clip display is #445, and live thumbnail coverage is not established. Desktop checks of preview tiles, playback, waveforms and review previews continue in #440. |
 | Application claims | Native [saved-job controls](../../scenario/blender/job_recovery.py) and [MCP result commands](../MCP.md) prepare and apply image, media, saved model package, material, World and supported mesh-edit destinations through ModelJobs/JobSession. Claims precede scene mutation; known receipt retries do not repeat it. The native and MCP Render Video first-frame handoff is a form binding: it verifies the saved image but takes no claim and leaves the job state unchanged. | Restarted uncertain claims require inspection. Format, target, rollback and undo limits differ by application; no atomic blend-file save is promised. Remaining first-frame handoff checks continue in #440. |
 | Prompt Spark | [Prompt commands](../SDK_ADOPTION.md#prompt-spark-command-boundary) use exact quotes, durable submission and complete text recovery on the shared workers. Native/MCP New, Rewrite and Translate require unchanged-field approval; render preparation has a separate Spark approval. | Live provider acceptance remains; Spark approval does not authorize the subsequent render generation. |
 | Uploads | [Reference uploads](../SDK_UPLOADS.md) use private staging, signed storage transfers and durable SDK commands on the shared workers. Generation and workflow forms attach through guarded bindings; native/MCP recovery and saved-reference attachment require the selected scope and fresh destination approval. | Live upload/result journeys remain open. |
 | Model forms | [Schema forms](../../scenario/core/schema/forms.py) validate adopted model inputs before shared pricing and submission. | Trained LoRAs and compositions use routes checked before quoting; a private composition and the desktop recheck of project defaults continue in #440. |
-| Mesh and World | [Mesh](../MESH_APPLICATION.md) and [World](../WORLD_APPLICATION.md) application have explicit UI/MCP destination flows for supported saved results. The native and MCP [Environment lane](../MCP.md#environment-lane-360-panoramas) generates panoramas through verified [model contracts](../../scenario/core/scene/panorama_contract.py) and leaves results saved for World approval. | Provider-specific mesh contracts under #99 remain incomplete. HY World output, seam/pole review and the remaining desktop evidence for the Environment tab (the rebased composer tab row and a local panorama file upload) continue in #440; local application does not close them. |
+| Mesh and World | [Mesh](../MESH_APPLICATION.md) and [World](../WORLD_APPLICATION.md) application have explicit UI/MCP destination flows for supported saved results. The native and MCP [Environment lane](../MCP.md#historical-upstream-reference) generates panoramas through verified [model contracts](../../scenario/core/scene/panorama_contract.py) and leaves results saved for World approval. | Provider-specific mesh contracts under #99 remain incomplete. HY World output, seam/pole review and the remaining desktop evidence for the Environment tab (the rebased composer tab row and a local panorama file upload) continue in #440; local application does not close them. |
 
 The job lifecycle records intent before submission, binds an exact estimate to
 scope and origin, and treats transport uncertainty as recoverable uncertainty.
@@ -125,7 +181,7 @@ clients see.
 - Build, installation and isolation are owned by [tools/](../../tools/) and
   [Makefile](../../Makefile), not a second packaging path.
 
-## Acceptance boundaries
+## Historical upstream acceptance boundaries
 
 0.10.0 delivered consolidated adoption, the shared runtime and the views. The
 open checks, fixes and decisions are in

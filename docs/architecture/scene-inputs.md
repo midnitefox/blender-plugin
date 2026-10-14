@@ -62,7 +62,7 @@ including prompt decoration and uploaded input ordering. Callers omit raw model
 parameters and configure the form first. Empty automatic looks require the
 existing separate Spark quote/approval/delivery before the final render price.
 No capture, upload or paid Spark call occurs during render generation. Result
-application remains explicit. See the [MCP sequence](../MCP.md#preparing-render-image-and-render-video)
+application remains explicit. See the [MCP sequence](../MCP.md#historical-upstream-reference)
 and [context contract](../BLENDER_JOB_CONTEXT.md#mcp-render-form-commands).
 
 ## Saved 3D edit application boundary

@@ -3,7 +3,10 @@
 """Installed MCP Python gate, private capture-file lifetime and the agent upload allowlist."""
 
 import base64
+import hashlib
+import json
 import os
+import shutil
 import tempfile
 import time
 import unittest
@@ -14,7 +17,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import bpy
-from helpers import submodule
+from helpers import FIXTURES, submodule
 
 
 class McpSecurityTests(unittest.TestCase):
@@ -48,33 +51,48 @@ class McpSecurityTests(unittest.TestCase):
             Path(path).write_bytes(b"image")
         self.assertFalse(directory.exists())
 
-    def test_render_capture_removes_directory_on_success_and_errors(self):
-        capture = submodule("blender.capture")
-        for failure in (None, "capture", "read"):
+    def test_still_output_retains_success_and_removes_partial_capture_read_and_decode_errors(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory(prefix="capture-contract-")))
+        self.enterContext(patch.object(self.tools, "_still_outbox", return_value=root))
+        fixture = FIXTURES / "synthetic" / "reference-toadstool-512.png"
+        for failure in (None, "capture", "read", "decode"):
             with self.subTest(failure=failure):
-                created = []
+                created, before = [], set(root.iterdir())
 
-                def write_capture(context, path, *, created=created, failure=failure, **kwargs):
+                def write_capture(path, *, created=created, failure=failure):
                     created.append(Path(path).parent)
-                    Path(path).write_bytes(b"synthetic capture")
+                    shutil.copyfile(fixture, path)
                     if failure == "capture":
                         raise RuntimeError("capture failure")
-
-                with patch.object(capture, "capture_still", side_effect=write_capture):
                     if failure == "read":
-                        with patch.object(
-                            self.tools, "_png_content", side_effect=OSError("read failure")
-                        ):
-                            with self.assertRaises(OSError):
-                                self.tools.render_still({})
-                    elif failure:
-                        with self.assertRaises(RuntimeError):
-                            self.tools.render_still({})
-                    else:
-                        result = self.tools.render_still({})
-                        self.assertEqual(base64.b64decode(result["_image"]), b"synthetic capture")
+                        Path(path).unlink()
+                    if failure == "decode":
+                        Path(path).write_bytes(fixture.read_bytes()[:33] + b"corrupt PNG body")
+
+                def output():
+                    return self.tools._still_payload(
+                        write_capture, source="VIEWPORT", expected_size=(512, 512)
+                    )
+
+                if failure:
+                    with self.assertRaises((RuntimeError, ValueError)):
+                        output()
+                    self.assertEqual(set(root.iterdir()), before)
+                else:
+                    result = output()
+                    metadata = json.loads(result[0]["text"])
+                    retained = Path(metadata["path"])
+                    self.assertTrue(metadata["retained"])
+                    self.assertEqual(retained.read_bytes(), fixture.read_bytes())
+                    self.assertEqual(
+                        metadata["sha256"], hashlib.sha256(retained.read_bytes()).hexdigest()
+                    )
+                    self.assertEqual(result[1]["mimeType"], "image/png")
+                    self.assertTrue(
+                        base64.b64decode(result[1]["data"]).startswith(b"\x89PNG\r\n\x1a\n")
+                    )
                 self.assertEqual(len(created), 1)
-                self.assertFalse(created[0].exists())
+                self.assertEqual(created[0].exists(), failure is None)
 
     def test_render_still_and_screenshot_leave_no_temp_directory_in_background(self):
         self.assertTrue(bpy.app.background)
@@ -87,7 +105,6 @@ class McpSecurityTests(unittest.TestCase):
 
     def test_installed_tool_failures_return_sanitized_text(self):
         protocol = submodule("mcp.protocol")
-        capture = submodule("blender.capture")
         registry = submodule("blender.mcp_service").build_registry()
         installed = str(Path(protocol.__file__).resolve().parents[1])
         private = os.path.join(tempfile.gettempdir(), "scenario-mcp-fixture", "private.png")
@@ -123,8 +140,8 @@ class McpSecurityTests(unittest.TestCase):
             prefs.mcp_allow_python = False
             self.assertEqual(
                 call("execute_python", {"code": "result['value'] = 1"}),
-                "PermissionError: Python execution is disabled in Scenario preferences "
-                "(MCP > Allow connected agents to run Python)",
+                "PermissionError: Python execution is disabled in Open Studio preferences "
+                "(Local assistant connection > Allow connected assistants to run Python)",
             )
         finally:
             prefs.mcp_allow_python = original
@@ -134,11 +151,24 @@ class McpSecurityTests(unittest.TestCase):
             call("set_frame", {"frame": private}),
             "ValueError: set_frame failed unexpectedly; see the Blender console",
         )
-        with patch.object(capture, "capture_still", return_value=None):
+        self.assertEqual(
+            call("render_still", {"source": "VIEWPORT"}),
+            "RuntimeError: Still capture needs the Blender GUI and an open 3D viewport",
+        )
+        # Exercise the registered capture tool's unexpected-error boundary with
+        # an actual OS read failure containing a private filename. The existing
+        # background guard intentionally prevents reaching a real GUI renderer.
+        with (
+            self.tools._private_png("missing.png") as missing,
+            patch.object(
+                self.tools, "_still_plan", side_effect=lambda _: Path(missing).read_bytes()
+            ) as plan,
+        ):
             self.assertEqual(
                 call("render_still", {}),
                 "FileNotFoundError: render_still failed unexpectedly; see the Blender console",
             )
+        plan.assert_called_once()
 
 
 class McpUploadPolicyTests(unittest.TestCase):

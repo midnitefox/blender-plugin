@@ -56,7 +56,7 @@ def _push(message):
     context = bpy.context
     window = _window(context)
     if window is None:
-        _log.warning("Scenario changed the scene, but Blender has no window to mark it modified")
+        _log.warning("Open Studio changed the scene, but Blender has no window to mark it modified")
         return False
     try:
         if window == context.window and context.screen is not None:
@@ -67,7 +67,7 @@ def _push(message):
     except Exception:
         # The change is complete. A missing mark is not a failed change and must
         # never authorize repeating it.
-        _log.warning("Scenario changed the scene, but Blender could not mark it modified")
+        _log.warning("Open Studio changed the scene, but Blender could not mark it modified")
         return False
     return result == {"FINISHED"}
 

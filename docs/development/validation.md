@@ -1,7 +1,9 @@
 # Validation and local commands
 
-See [the environment reference](../../CONTRIBUTING.md#environment-variables) for
-developer credentials and explicit live commands.
+The active assistant runtime needs no generation credentials. Use isolated
+native assistant tests for its current behavior. The
+[environment reference](../../CONTRIBUTING.md#environment-variables) also retains
+explicit upstream service-maintenance commands; those are outside normal setup.
 
 Use the uv version required by `pyproject.toml`. Run `uv sync --locked` to create
 the worktree's `.venv` from `uv.lock` and the interpreter in `.python-version`.
@@ -359,6 +361,12 @@ not establish published release-pair compatibility or public update availability
   baseline in a new profile. No prior installation is needed. Logs and ZIP remain
   under `.blender-profile/run-*`; successful profiles are removed. Use
   `BLENDER_TEST_ARGS="--suite all"` for the full existing integration suite.
+  For a targeted fix, use repeated `--test` arguments, for example
+  `uv run --locked --no-env-file python tools/test_blender.py --test test_provider_setup --test test_agent_artifacts`.
+  Each name can select a module, class or method. The runner still verifies the
+  exact installed ZIP, isolated profile, network guard and extension lifecycle;
+  its report identifies this as a focused run and records the selected tests.
+  A focused pass does not establish baseline or full-suite acceptance.
 - `make gui-check`: build and capture an exact ZIP in a fresh offline GUI profile.
   `LANE=video` selects a lane; the default is `image`. An explicit `--lane` in
   `BLENDER_GUI_ARGS` takes precedence over `LANE`.
@@ -377,7 +385,7 @@ not establish published release-pair compatibility or public update availability
 - Smoke tests, generation, prompt helpers and scene design can spend credits.
   Do not run them as part of a documentation command.
 
-Use `blender --background scene.blend --command scenario_blender` for local MCP.
+Use `blender --background scene.blend --command open_studio` for local MCP.
 Set `SCENARIO_BLENDER_TOKEN` for an explicit token, or use the generated session
 token shown at startup. Online access must be enabled; SIGINT/SIGTERM stop the
 server cleanly. Run it only in the isolated development profile described above.

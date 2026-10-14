@@ -5,11 +5,16 @@ Read [AGENTS.md](../../AGENTS.md), [UI style](../UI_STYLE.md) and
 These requirements apply to `scenario/blender/`, scene tools in `scenario/mcp/`
 and native tests. Pure protocol and core modules must remain free of `bpy`.
 
+The current assistant entry points are listed in the [runtime map](runtime.md).
+References below to catalog workers, JobSession, cloud claims, paid jobs and
+upstream preview panels describe retained service source. They do not apply to
+assistant setup or authorize adding those systems to active registration.
+
 ## Threads, context and storage
 
-Keep `bpy` access on Blender's main thread. The GUI timer in the
-[pump](../../scenario/blender/pump.py) runs shared runtime maintenance, local MCP
-requests and catalog worker events; the
+Keep `bpy` access on Blender's main thread. The GUI timer in
+[assistant_loop.py](../../scenario/blender/assistant_loop.py) processes local MCP
+requests and pending file-modified marks; the
 [MCP service](../../scenario/blender/mcp_service.py) supplies headless queue
 processing. A GUI timer is not proof that background mode delivers work.
 Never mutate properties in `draw()` or keep a worker dependent on a live panel.
@@ -41,10 +46,11 @@ lane, and each player's by its own watcher thread. See
 Mark the file modified after every main-thread change that no Undo operator
 records; see [marking the file modified](#marking-the-file-modified).
 
-New shared-runtime integration must use explicit account, project, scene and
-target identity. [JobSession](../BLENDER_JOB_CONTEXT.md) captures and validates
-origins; names alone cannot identify a deleted or replaced object. Closing a
-view must not cancel application-owned jobs or route their results elsewhere.
+Assistant operations must bind work to the captured scene and target identity;
+names alone cannot identify a deleted or replaced object. Deferred results must
+refuse a replacement scene. Retained service integration additionally uses
+account/project scope and [JobSession](../BLENDER_JOB_CONTEXT.md) origins. Closing
+a view must not route pending results to another target.
 
 ## Marking the file modified
 

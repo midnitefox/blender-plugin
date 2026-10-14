@@ -19,7 +19,7 @@ def open_sidebar(area):
         for region in area.regions:
             if region.type == "UI":
                 try:
-                    region.active_panel_category = "Scenario"
+                    region.active_panel_category = "Open Studio"
                     region.tag_redraw()
                     return True
                 except (AttributeError, TypeError, ReferenceError):
@@ -45,7 +45,7 @@ def _view3d_area(context):
 
 class SCENARIO_OT_open_panel(bpy.types.Operator):
     bl_idname = "scenario.open_panel"
-    bl_label = "Scenario"
+    bl_label = "Open Studio"
     bl_description = (
         "Open the Scenario panel in the sidebar: models, references, settings, jobs and generations"
     )
@@ -61,7 +61,7 @@ class SCENARIO_OT_open_panel(bpy.types.Operator):
 def draw_header_button(self, context):
     if context.space_data is None or context.space_data.type != "VIEW_3D":
         return
-    self.layout.operator(SCENARIO_OT_open_panel.bl_idname, text="Scenario", icon="SHADERFX")
+    self.layout.operator(SCENARIO_OT_open_panel.bl_idname, text="Open Studio", icon="SHADERFX")
     self.layout.operator("scenario.open_studio", text="Studio", icon="FULLSCREEN_ENTER")
 
 
